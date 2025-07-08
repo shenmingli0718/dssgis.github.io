@@ -1,0 +1,73 @@
+/* assets/custom.css */
+
+@media screen {
+    iframe#map {
+        border: 2px solid red;
+        margin: 2px;
+    }
+    #popup-content {
+        box-shadow: 0px 30px 18px -8px blue;
+    }
+}
+/* 針對小於 992px 螢幕（平板與手機）做響應式調整 */
+@media (max-width: 991.98px) {
+    .dash-col-left,
+    .dash-col-right {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 0 0 100% !important;
+    }
+
+    iframe#map {
+        height: 400px !important;
+    }
+    /* #popup-content {
+        transform: scale(0.8, 0.8);
+        box-shadow: 0px 30px 18px -8px red;
+    } */
+}
+
+/* 手機進一步縮小時的細部優化 */
+@media (max-width: 576px) {
+    .dash-col-left {
+        padding: 10px;
+    }
+
+    .dash-col-right {
+        padding: 0;
+    }
+
+    iframe#map {
+        height: 300px !important;
+    }
+
+    /* #popup-content {
+        font-size: 13px;
+    } */
+    /* #popup-content button {
+        font-size: 13px;
+        padding: 6px 10px;
+    } */    
+    }
+
+/* 手機:地圖標記popup縮小比例 */
+/* @media (min-width: 576px) {
+    #popup-content {
+        transform: scale(0.6, 0.6);
+        box-shadow: 0px 30px 18px -8px red;
+    }
+} */
+/* 平板:地圖標記popup縮小比例 */
+/* @media (min-width: 768px) {
+    #popup-content {
+        transform: scale(0.8, 0.8);
+        box-shadow: 0px 30px 18px -8px orange;
+    }
+} */
+/* 電腦螢幕:地圖標記popup縮小比例 */
+/* @media (min-width: 992px) {
+    #popup-content {
+        transform: scale(1.0, 1.0);
+        box-shadow: 0px 30px 18px -8px green;
+    }
+} */

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>景點資料編輯</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    select, textarea, button {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+    }
+    textarea {
+      resize: vertical;
+    }
+    #temp-storage {
+      margin-top: 20px;
+      border: 1px solid #ccc;
+      padding: 10px;
+    }
+    .storage-item {
+      border-bottom: 1px dashed #ccc;
+      padding: 10px 0;
+    }
+    button {
+      margin-top: 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>景點資料編輯</h1>
+
+  <!-- 顯示景點 ID 和名稱 -->
+  <div id="info">
+    <strong>景點ID：</strong> <span id="location-id"></span><br>
+    <strong>景點名稱：</strong> <span id="location-name"></span>
+  </div>
+  
+  <!-- 編輯區 -->
+  <div class="form-group">
+    <label for="field-select">選擇欄位名稱：</label>
+    <select id="field-select"></select>
+  </div>
+  <div class="form-group">
+    <label for="field-content">編輯欄位內容：</label>
+    <textarea id="field-content" rows="5" placeholder="後端內容編輯..."></textarea>
+  </div>
+  <button id="save-btn">確定置於暫存區</button>
+
+  <!-- 暫存區 -->
+  <div id="temp-storage">
+    <h3>暫存區</h3>
+    <div id="storage-list"></div>
+    <button id="upload-btn">暫存區確定上傳更新</button>
+  </div>
+
+  <script>
+    // 解析 URL 參數
+    function getQueryParams() {
+      const urlParams = new URLSearchParams(window.location.search);
+      return {
+        id: urlParams.get('id'),
+        name: urlParams.get('name')
+      };
+    }
+
+    // 初始化頁面資訊
+    const params = getQueryParams();
+    document.getElementById('location-id').textContent = params.id || '未提供';
+    document.getElementById('location-name').textContent = params.name || '未提供';
+
+    let fieldCache = []; // 暫存欄位資訊
+
+    // 使用 async/await 加載欄位資訊
+    async function loadFields() {
+      try {
+        // const response = await fetch(`http://localhost:3000/api/get-fields?PlaceID=${params.id}`);
+        // const response = await fetch(`https://ntgisapigithubio-production.up.railway.app/api/get-fields?PlaceID=${params.id}`);
+        const response = await fetch(`https://ntgisapi.zeabur.app/api/get-fields?PlaceID=${params.id}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        const data = await response.json();
+        fieldCache = data.fields; // 緩存欄位資訊
+
+        const fieldSelect = document.getElementById('field-select');
+        fieldSelect.innerHTML = ''; // 清空下拉選單
+
+        // 生成欄位選項
+        fieldCache.forEach(field => {
+          const option = document.createElement('option');
+          option.value = field.key; // 英文欄位名稱
+          option.textContent = field.label; // 中文欄位名稱
+          fieldSelect.appendChild(option);
+        });
+
+        // 預設加載第一個欄位的內容
+        if (fieldCache.length > 0) {
+          document.getElementById('field-content').value = fieldCache[0].content || '';
+        }
+      } catch (error) {
+        console.error('加載欄位失敗：', error);
+        alert('無法加載欄位資訊，請稍後再試。');
+      }
+    }
+
+    // 初始化頁面並加載欄位資訊
+    loadFields();
+
+    // 下拉選單變更事件
+    document.getElementById('field-select').addEventListener('change', function () {
+      const fieldKey = this.value;
+      const selectedField = fieldCache.find(field => field.key === fieldKey);
+      document.getElementById('field-content').value = selectedField?.content || '';
+    });
+
+    // 點擊確定按鈕，將資料加入暫存區
+    document.getElementById('save-btn').addEventListener('click', function () {
+      const engfield = document.getElementById('field-select').value;  // 英文欄位名稱
+      const chifield = document.getElementById('field-select').selectedOptions[0].textContent; // 中文欄位名稱
+      const content = document.getElementById('field-content').value;
+
+      if (!content) {
+        alert('請輸入內容後再確定！');
+        return;
+      }
+
+      // 將資料顯示在暫存區
+      const storageList = document.getElementById('storage-list');
+      const newItem = document.createElement('div');
+      newItem.className = 'storage-item';
+      newItem.innerHTML = `<strong>${chifield}：</strong>${content}`;
+      newItem.dataset.engfield = engfield;
+      newItem.dataset.content = content;
+      storageList.appendChild(newItem);
+
+      // 清空編輯區
+      // document.getElementById('field-content').value = '';
+    });
+
+    // 點擊上傳按鈕，將暫存區資料提交至後端
+    document.getElementById('upload-btn').addEventListener('click', async function () {
+      const storageItems = document.querySelectorAll('.storage-item');
+      const dataToUpload = [];
+
+      storageItems.forEach(item => {
+        dataToUpload.push({
+          PlaceID: params.id, // 景點 ID
+          field: item.dataset.engfield,   // 使用英文欄位名稱
+          content: item.dataset.content   // 使用內容
+        });
+      });
+
+      try {
+        // const response = await fetch('http://localhost:3000/api/update-csv', {
+        // const response = await fetch('https://ntgisapigithubio-production.up.railway.app/api/update-csv', {
+        const response = await fetch('https://ntgisapi.zeabur.app/api/update-csv', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(dataToUpload)
+        });
+
+        if (!response.ok) {
+          throw new Error(`上傳失敗：HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        // 再次初始化頁面並加載欄位資訊
+        loadFields();
+        // console.log('子窗口來源:', window.origin);
+        // console.log('父窗口來源:', window.opener.origin);
+        // window.opener.postMessage({ action: 'updateMap', data: updatedData }, '*');
+        if (!window.opener) {
+            console.warn('父窗口未檢測到，子窗口無法通信。');
+        }
+
+        window.opener.postMessage({ action: 'updateMap', id: params.id }, '*');
+        // window.opener.postMessage({ action: 'updateMap', id: params.id }, 'http://0.0.0.0:8799'); // 安全性要求 
+        // window.opener.postMessage({ action: 'updateMap', id: params.id }, 'http://localhost:8799'); // 安全性要求
+        
+         alert(result.message || '資料已成功更新！若更改景點X、Y座標，需重新繪製地圖');
+        // 清空暫存區
+        document.getElementById('storage-list').innerHTML = '';
+        
+      } catch (error) {
+        console.error('上傳失敗：', error);
+        alert('資料上傳失敗，請稍後再試。');
+      }
+    });
+  </script>
+</body>
+</html>

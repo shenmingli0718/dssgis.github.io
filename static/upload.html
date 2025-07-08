@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>上傳照片</title>
+</head>
+
+<body>
+    <h1>上傳照片</h1>
+    <div id="content">
+        <!-- 景點資訊將動態插入 -->
+    </div>
+    <!-- <input type="file" id="fileInput" multiple="multiple" /><br> -->
+    <input type="file" id="fileInput" multiple="multiple" accept="image/*"><br>
+    <label id="label"> </label><br>
+    <div id="progressContainer">
+        <progress id="uploadProgress" value="0" max="100"></progress>
+    </div>
+    <script>
+        // 解析 URL 查詢參數
+        function getQueryParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                id: params.get('id'),
+                name: params.get('name'),
+            };
+        }
+
+        // 動態顯示景點資訊
+        const params = getQueryParams();
+        const contentDiv = document.getElementById('content');
+        if (params.id && params.name) {
+            contentDiv.innerHTML = `
+                <p><b>景點 ID：</b> ${params.id}</p>
+                <p><b>景點名稱：</b> ${params.name}</p>
+            `;
+        } else {
+            contentDiv.innerHTML = '<p>無法獲取景點資訊。</p>';
+        }
+
+        // 設定上傳照片的路徑（可根據 ID 和名稱設置專屬資料夾）
+        //const uploadForm = document.getElementById('uploadForm');
+        //uploadForm.action = `/upload?id=${params.id}&name=${params.name}`;
+    </script>
+    <!-- 引用外部 JavaScript -->
+    <script src="assets/fileUpload.js"></script>
+</body>
+
+</html>
