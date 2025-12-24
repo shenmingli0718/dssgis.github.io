@@ -1,5 +1,21 @@
 ## user define function
 #
+# import os
+import geopandas as gpd
+# import folium
+
+def _load_layer_to_4326(shp_path: str) -> gpd.GeoDataFrame:
+    """讀 shapefile；若非 WGS84 則轉 EPSG:4326。"""
+    gdf = gpd.read_file(shp_path, encoding="utf-8")
+    if gdf.crs is None or gdf.crs.to_epsg() != 4326:
+        gdf = gdf.to_crs(epsg=4326)
+    # 清一下字串空白（常見全形/半形）
+    for c in gdf.columns:
+        if gdf[c].dtype == object:
+            gdf[c] = gdf[c].astype(str).str.replace("　","").str.replace(" ","").str.strip()
+    return gdf
+
+#
 def style_function(feature):
     return {
         'fillColor': 'lightgreen',
@@ -16,7 +32,8 @@ def get_tourist_data():
     API_URL = os.getenv("API_URL")
     if API_URL is None or API_URL.strip() == "":
 ##      API_URL = "https://ntgisapigithubio-production.up.railway.app"
-        API_URL = "https://ntgisapi.zeabur.app"
+        # API_URL = "https://ntgisapi.zeabur.app"
+        API_URL = "http://localhost:3000"
 
 
     API_URL = API_URL + "/get_tourist_data"
@@ -59,7 +76,7 @@ def get_tourist_data():
 
         return df
     else:
-        print("Failed to fetch 新北觀光旅遊檔")
+        print("Failed to fetch 全國觀光旅遊景點檔")
         return pd.DataFrame()
 
 def create_vp_dropdown_options(breakpoint_name, zipcode,window_width):
@@ -109,10 +126,12 @@ def calculate_center_point(data,selected_zipcode):
     data = data.dropna(subset=['Zipcode'])
 
     # 將Zipcode轉換為整數
-    #data['Zipcode'] = data['Zipcode'].astype(int)
-
+    # data['Zipcode'] = data['Zipcode'].astype(int)
+    print("data['Zipccode']:",type(data['Zipcode'].iloc[0]))
+    print("selected_zipcode",type(selected_zipcode))
     # 篩選出指定Zipcode的資料
     selected_data = data[data['Zipcode'] == selected_zipcode]
+    print("計算地理中心:",selected_zipcode,"找到筆數：", len(selected_data))
 
     # 計算該 Zipcode 的地理中心點
     # center_px = selected_data['Px'].mean()
@@ -129,14 +148,24 @@ def create_map1(breakpoint_name, zipcode, server_ip, window_width):
     import folium
     from folium import Map, Marker, Popup
     from folium.plugins import MarkerCluster
+    from folium import Element
     import branca
     import io
     import math
+    import os
     
     # 讀取大台北鄉鎮市區界圖shpe file(含台北市、新北市)
-    Big_Taipei_data = gpd.read_file('static/shapefiles/Taipei.shp', encoding='utf-8')
-    Ｎew_Taipei_data = Big_Taipei_data[(Big_Taipei_data['COUNTYNAME']=='新北市')]
-    #
+    # Big_Taipei_data = gpd.read_file('static/shapefiles/Taipei.shp', encoding='utf-8')
+    # Ｎew_Taipei_data = Big_Taipei_data[(Big_Taipei_data['COUNTYNAME']=='新北市')]
+    # 讀取全國鄉鎮市區界圖及屏東縣瑪家鄉三和村sshpe file
+    base_dir = os.path.dirname(__file__)
+    town_shp = os.path.join(base_dir, "static", "shapefiles", "TOWN_MOI_1140318.shp")
+    sanhe_shp = os.path.join(base_dir, "static", "shapefiles", "Town_Majia_Sanhe.shp")
+
+    # === 讀檔並確保是 WGS84 ===
+    Domestic_gdf = _load_layer_to_4326(town_shp)      # 鄉鎮市區界
+    Sanhe_gdf    = _load_layer_to_4326(sanhe_shp)     # 三和村（專屬 shapefile）
+    
     # 讀取 "新北市觀光旅遊景點(中文).csv" 檔案
     # df = pd.read_csv('./static/newtpe_tourist_att.csv', encoding='utf-8')
     df = get_tourist_data()
@@ -145,8 +174,34 @@ def create_map1(breakpoint_name, zipcode, server_ip, window_width):
     selected_center=calculate_center_point(df,zipcode)
     mymap = Map(location=selected_center, zoom_start=12)
     # 將 Shapefile 轉為 GeoJSON 並添加到地圖
-    folium.GeoJson(New_Taipei_data, style_function=style_function).add_to(mymap)
-    
+    # folium.GeoJson(New_Taipei_data, style_function=style_function).add_to(mymap)
+    # folium.GeoJson(Domestic_data, style_function=style_function).add_to(mymap)
+    # folium.GeoJson(Sanhe_data, style_function=style_function).add_to(mymap)
+    # === 疊鄉鎮界（灰線、很淡底色） ===
+    # 欄位常見：COUNTYNAME / TOWNNAME
+    # folium.GeoJson(
+    #     Domestic_gdf[["COUNTYNAME","TOWNNAME","geometry"]],
+    #     name="鄉鎮市區界",
+    #     # style_function=lambda x: {"fillOpacity": 0.03, "color": "#666", "weight": 1},
+    #     style_function=lambda x: {"fillOpacity": 0.00, "color": "#666", "weight": 0},
+    #     tooltip=folium.GeoJsonTooltip(
+    #         fields=["COUNTYNAME","TOWNNAME"], aliases=["縣市","鄉鎮市區"], sticky=False
+    #     ),
+    # ).add_to(mymap)
+
+    # === 疊三和村（橘色高亮） ===
+    # 村里欄位常見：VILLNAME（有就顯示，沒有就只顯示縣市/鄉鎮）
+    vill_col = "VILLNAME" if "VILLNAME" in Sanhe_gdf.columns else None
+    tooltip_fields = ["COUNTYNAME","TOWNNAME"] + ([vill_col] if vill_col else [])
+    tooltip_alias  = ["縣市","鄉鎮市區"] + (["村里"] if vill_col else [])
+
+    folium.GeoJson(
+        Sanhe_gdf[tooltip_fields + ["geometry"]] if tooltip_fields else Sanhe_gdf,
+        name="屏東縣瑪家鄉三和村",
+        style_function=lambda x: {"fillColor": "#ffa500", "color": "#ffa500", "weight": 3, "fillOpacity": 0.5},
+        tooltip=folium.GeoJsonTooltip(fields=tooltip_fields, aliases=tooltip_alias, sticky=False) if tooltip_fields else None,
+    ).add_to(mymap)
+
     # Add 新北市觀光旅遊景點標記 to the map
     #selected_df = df[df['Zipcode'] == zipcode]
     #for idx, row in selected_df.iterrows():
@@ -158,6 +213,10 @@ def create_map1(breakpoint_name, zipcode, server_ip, window_width):
     #df_cleaned = df.dropna(subset=['id', 'name'], inplace=False)
     df.dropna(subset=['Id', 'Name'], inplace=True)
     
+    ##
+    # 將Zipcode轉換為整數
+    # df['Zipcode'] = df['Zipcode'].astype(int)
+    ##
     # Add Marker Cluster(地圖上的相鄰觀光旅遊景點標記點(Markers)群組在一起) to the map
     selected_df = df[df['Zipcode'] == zipcode].reset_index(drop=True)
     marker_cluster = MarkerCluster()
@@ -173,33 +232,82 @@ def create_map1(breakpoint_name, zipcode, server_ip, window_width):
             ## popup_html = f"""
             ##    <div id="popup-content" style="width: auto; max-width: 60vx; max-height: 60vh; overflow-y: auto;">
             popup_html = f"""
-                <div id="popup-content" style="max-width: 98vw; max-height: 98vh; font-size: 14px;">        
+                <html><body>
+                <style> 
+                /* popup 內所有按鈕（含 Bootstrap .btn） */
+                button, .btn {{
+                  /* 透明底但看得見：淡白底 + 清楚邊框 */
+                  background: rgba(255,255,255,0.1) !important;   /* 基本透明度 */
+                  /* border: 2px solid rgba(0,0,0,0.6) !important; */
+                  color: #003366 !important;       /* 深藍，穩重、易讀 */
+                  border: 1.5px solid #003366 !important;
+
+                  /* 輕微毛玻璃，讓地圖紋理不搶眼（支援瀏覽器才會生效） */
+                  -webkit-backdrop-filter: blur(2px);
+                  backdrop-filter: blur(2px);
+
+                  /* 形狀與間距 */
+                  border-radius: 10px !important;
+                  padding: 6px 12px !important;
+                  font-weight: 600;
+
+                  /* 移除瀏覽器/Bootstrap 遺留外觀 */
+                  background-image: none !important;
+                  box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important;
+                  outline: none !important;
+                  -webkit-appearance: none !important;
+                  -moz-appearance: none !important;
+                  appearance: none !important;
+
+                  /* 動畫回饋 */
+                  transition: background .15s ease, box-shadow .15s ease, transform .05s ease;
+                }}
+
+                /* 滑過更清楚一點 */
+                button:hover, .btn:hover {{
+                  background: rgba(255,255,255,0.30) !important;
+                  box-shadow: 0 2px 6px rgba(0,0,0,0.25) !important;
+                }}
+
+                /* 點下去有壓下感 */
+                button:active, .btn:active {{
+                  transform: translateY(1px);
+                }}
+
+                /* 鍵盤可及性：聚焦外框（不會改變透明感） */
+                button:focus-visible, .btn:focus-visible {{
+                  box-shadow: 0 0 0 3px rgba(0,123,255,0.35) !important;
+                }}
+                </style>
+                <div>        
                     <b>{name}</b><br>
                     <b>{row['Opentime']}</b><br>
                     <b>{row['Add']}</b><br>
                     <b>{row['Tel']}</b><br><br>
-                    <button style="width: 100%;" onclick="openWindow('upload', '{id_}', '{name}', '{server_ip}')">上傳照片</button><br><br>
-                    <button style="width: 100%;" onclick="openWindow('download', '{id_}', '{name}', '{server_ip}')">下載照片</button><br><br>
+                    <button onclick="openWindow('upload', '{id_}', '{name}', '{server_ip}')">上傳照片</button><br><br>
+                    <button onclick="openWindow('download', '{id_}', '{name}', '{server_ip}')">下載照片</button><br><br>
                     <!-- <button onclick="openWindow('edit', '{id_}', '{name}')">填寫相關資訊</button> -->
-                    <script>
-                        function openWindow(action, locationId, name, server_ip) {{
-                            // server_ip :取自Dash 的 index_string 模板定義
-                            let url = '';
-                            // let customedomain='https://ntgisgithubio-production.up.railway.app';
-                            let customedomain='https://ntgis.zeabur.app';
-                            if (action === "upload") {{
+                </div>
+                <script>
+                    function openWindow(action, locationId, name, server_ip) {{
+                        // server_ip :取自Dash 的 index_string 模板定義
+                        let url = '';
+                        // let customedomain='https://ntgisgithubio-production.up.railway.app';
+                        // let customedomain='https://ntgis.zeabur.app';
+                        let customedomain=`http://${{server_ip}}:8799`;
+                        if (action === "upload") {{
                             // url = `http://${{server_ip}}:8799/static/upload.html?id=${{locationId}}&name=${{name}}`;
-                                url = `${{customedomain}}/static/upload.html?id=${{locationId}}&name=${{name}}`;
-                                window.open(url, '上傳照片', 'width=600, height=400');
-                            }} else if (action === "download") {{
+                            url = `${{customedomain}}/static/upload.html?id=${{locationId}}&name=${{name}}`;
+                            window.open(url, '上傳照片', 'width=600, height=400');
+                        }} else if (action === "download") {{
                             // url = `http://${{server_ip}}:8799/static/download.html?id=${{locationId}}&name=${{name}}`;
-                                url = `${{customedomain}}/static/download.html?id=${{locationId}}&name=${{name}}`;
-                                window.open(url, '下載照片', 'scrollbars=yes, resizable=yes, width=600, height=400');
-                            }} else if (action === "edit") {{
+                            url = `${{customedomain}}/static/download.html?id=${{locationId}}&name=${{name}}`;
+                            window.open(url, '下載照片', 'scrollbars=yes, resizable=yes, width=600, height=400');
+                        }} else if (action === "edit") {{
                             // url = `http://${{server_ip}}:8799/static/edit.html?id=${{locationId}}&name=${{name}}`;
                                 url = `${{customedomain}}/static/edit.html?id=${{locationId}}&name=${{name}}`;
                                 window.open(url, '填寫相關資訊', 'scrollbars=yes, resizable=yes, width=600, height=400');
-                            }}   
+                        }}   
                         }}
                         // 使標記的Popup跟隨地圖縮放(視窗內)
                         // function updatePopupSize() {{
@@ -248,17 +356,46 @@ def create_map1(breakpoint_name, zipcode, server_ip, window_width):
                         //   }};
                     // }}
                     </script>
-                </div>
+                </body></html>
             """
 
-
+            ###
+            # 注入 CSS
+            css = """
+            <style>
+            .leaflet-popup-content-wrapper {
+                background: rgba(255,255,255,0.6) !important; /* 半透明白底 */
+                color: #000 !important; /* 黑色字 */
+                font-weight: 500;       /* 稍微加粗，增強對比 */
+            }
+            .leaflet-popup-content,
+            .leaflet-popup-content * {
+                color: #000 !important;
+                text-shadow: 0px 0px 3px rgba(255, 255, 255, 0.8);
+            }
+            .leaflet-popup-tip {
+                background: rgba(255,255,255,0.6) !important;
+            }
+            /* 強制覆蓋 Bootstrap 的 .btn */
+            /* .leaflet-popup-content button,
+            .leaflet-popup-content .btn {
+                background-color: transparent !important;
+                color: red !important;
+                border: 1px solid black !important;
+                box-shadow: none !important;
+            } */
+            </style>
+            """
+            mymap.get_root().html.add_child(Element(css))
+            ###
             ##
             #marker_cluster.add_child(Marker([row['Py'], row['Px']]))
             ##
             #print("(create_map1) popup_html= ", popup_html)
             #iframe = folium.IFrame(popup_html, width=150, height=150)
             # iframe = branca.element.IFrame(popup_html, width=200, height=180)
-            iframe = branca.element.IFrame(popup_html, width=window_width*0.25, height=180)
+            # iframe = branca.element.IFrame(popup_html, width=window_width*0.25, height=180)
+            iframe = branca.element.IFrame(popup_html, width=window_width*0.25, height=240)
             # popup = folium.Popup(iframe, max_width=200, max_height=180)
             # popup = folium.Popup(iframe, max_width='auto')
             popup = folium.Popup(iframe, max_width=window_width*0.25)
@@ -286,22 +423,34 @@ def create_map1(breakpoint_name, zipcode, server_ip, window_width):
     #
     print("trace 2 on create_map1")
     #
-    return f"(斷點名稱: {breakpoint_name} 視窗寬度: {window_width} px)", map_html, error_msg, vp_dropdown_options
+    return f"(斷點名稱: {breakpoint_name} 視窗寬度: {window_width} px)", map_html, error_msg
 # 斷點處理
 def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
     import pandas as pd
     import geopandas as gpd
     import folium
     from folium import Marker
+    from folium import Element
     #from folium.plugins import MarkerCluster
     import branca
     import io
+    import os
     import math
     from dash import no_update
     
     # 讀取大台北鄉鎮市區界圖shpe file(含台北市、新北市)
-    Big_Taipei_data = gpd.read_file('static/shapefiles/Taipei.shp', encoding='utf-8')
-    Ｎew_Taipei_data = Big_Taipei_data[(Big_Taipei_data['COUNTYNAME']=='新北市')]
+    # Big_Taipei_data = gpd.read_file('static/shapefiles/Taipei.shp', encoding='utf-8')
+    # Ｎew_Taipei_data = Big_Taipei_data[(Big_Taipei_data['COUNTYNAME']=='新北市')]
+    
+    # 讀取全國鄉鎮市區界圖及屏東縣瑪家鄉三和村sshpe file
+    base_dir = os.path.dirname(__file__)
+    town_shp = os.path.join(base_dir, "static", "shapefiles", "TOWN_MOI_1140318.shp")
+    sanhe_shp = os.path.join(base_dir, "static", "shapefiles", "Town_Majia_Sanhe.shp")
+
+    # === 讀檔並確保是 WGS84 ===
+    Domestic_gdf = _load_layer_to_4326(town_shp)      # 鄉鎮市區界
+    Sanhe_gdf    = _load_layer_to_4326(sanhe_shp)     # 三和村（專屬 shapefile)
+    
     #
     # 讀取 "新北市觀光旅遊景點(中文).csv" 檔案
     # df = pd.read_csv('./static/newtpe_tourist_att.csv', encoding='utf-8')
@@ -315,6 +464,21 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
     # Add Marker Cluster(地圖上的相鄰觀光旅遊景點標記點(Markers)群組在一起) to the map
     #selected_df = df[df['Zipcode'] == zipcode and df['Name'] == viewpoint].drop_duplicates()
     # selected_df = df[(df['Zipcode'] == zipcode) & (df['Name'] == viewpoint)].drop_duplicates()
+    ##
+    print("Debug: Zipcode param =", zipcode, type(zipcode))
+    print("Debug: Viewpoint param =", viewpoint, type(viewpoint))
+    print("Debug: Sample df Zipcode =", df['Zipcode'].iloc[0], type(df['Zipcode'].iloc[0]))
+    print("Debug: Sample df Name =", df['Name'].iloc[0])
+    print("Unique Zipcodes in df:", df['Zipcode'].unique())
+    print("Unique Names (filtered by zipcode):", df[df['Zipcode']==str(zipcode)]['Name'].unique())
+    ##
+    # 確保欄位為字串並去除多餘空白
+    df['Zipcode'] = df['Zipcode'].astype(str).str.strip()
+    df['Name'] = df['Name'].astype(str).str.strip()
+
+    zipcode = str(zipcode).strip()
+    viewpoint = str(viewpoint).strip()
+    ##
     selected_df = df[((df['Zipcode'] == zipcode) & (df['Name'] == viewpoint)) | (df['Id'] == viewpoint)].drop_duplicates()
     #
     # 確保 selected_df 非空
@@ -332,7 +496,33 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
     #mymap = folium.Map(location=[selected_df['Py'], selected_df['Px']], zoom_start=12)
     #
     # 將 Shapefile 轉為 GeoJSON 並添加到地圖
-    folium.GeoJson(New_Taipei_data, style_function=style_function).add_to(mymap)
+    # folium.GeoJson(New_Taipei_data, style_function=style_function).add_to(mymap)
+    # folium.GeoJson(Domestic_data, style_function=style_function).add_to(mymap)
+    # folium.GeoJson(Sanhe_data, style_function=style_function).add_to(mymap)
+    # === 疊鄉鎮界（灰線、很淡底色） ===
+    # 欄位常見：COUNTYNAME / TOWNNAME
+    # folium.GeoJson(
+    #     Domestic_gdf[["COUNTYNAME","TOWNNAME","geometry"]],
+    #     name="鄉鎮市區界",
+    #     # style_function=lambda x: {"fillOpacity": 0.03, "color": "#666", "weight": 1},
+    #     style_function=lambda x: {"fillOpacity": 0.00, "color": "#666", "weight": 0},
+    #     tooltip=folium.GeoJsonTooltip(
+    #         fields=["COUNTYNAME","TOWNNAME"], aliases=["縣市","鄉鎮市區"], sticky=False
+    #     ),
+    # ).add_to(mymap)
+
+    # === 疊三和村（橘色高亮） ===
+    # 村里欄位常見：VILLNAME（有就顯示，沒有就只顯示縣市/鄉鎮）
+    vill_col = "VILLNAME" if "VILLNAME" in Sanhe_gdf.columns else None
+    tooltip_fields = ["COUNTYNAME","TOWNNAME"] + ([vill_col] if vill_col else [])
+    tooltip_alias  = ["縣市","鄉鎮市區"] + (["村里"] if vill_col else [])
+
+    folium.GeoJson(
+        Sanhe_gdf[tooltip_fields + ["geometry"]] if tooltip_fields else Sanhe_gdf,
+        name="屏東縣瑪家鄉三和村",
+        style_function=lambda x: {"fillColor": "#ffa500", "color": "#ffa500", "weight": 3, "fillOpacity": 0.5},
+        tooltip=folium.GeoJsonTooltip(fields=tooltip_fields, aliases=tooltip_alias, sticky=False) if tooltip_fields else None,
+    ).add_to(mymap)
     #
     for idx, row in selected_df.iterrows():
         # if not math.isnan(row['Py']) and not math.isnan(row['Px']):
@@ -347,30 +537,54 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
             ##    <div id="popup-content" style="width: auto; max-width: 60vx; max-height: 60vh; overflow-y: auto;">
             # popup_html = f"""
             popup_html = f"""
-                <!-- <style> 
-                /* 手機:地圖標記popup縮小比例 */
-                /* @media (min-width: 150px) {{
-                    #popup-content {{
-                        transform: scale(0.6, 0.6);
-                        background: red;
-                    }}
-                }} */
-                /* 平板:地圖標記popup縮小比例 */
-                /* @media (min-width: 768px) {{
-                    #popup-content {{
-                        transform: scale(0.8, 0.8);
-                        background: orange;
-                    }}
-                }} */
-                /* 電腦螢幕:地圖標記popup縮小比例 */
-                /* @media (min-width: 992px) {{
-                    #popup-content {{
-                        transform: scale(1.0, 1.0);
-                        background: green;
-                    }}
-                }} */
-                 </style> -->
-                <div id="popup-content" style="max-width: 98vw; max-height: 98vh; font-size: 14px; position: relative;">
+                <html><body>
+                <style> 
+                /* popup 內所有按鈕（含 Bootstrap .btn） */
+                button, .btn {{
+                  /* 透明底但看得見：淡白底 + 清楚邊框 */
+                  background: rgba(255,255,255,0.1) !important;   /* 基本透明度 */
+                  /* border: 2px solid rgba(0,0,0,0.6) !important; */
+                  color: #003366 !important;       /* 深藍，穩重、易讀 */
+                  border: 1.5px solid #003366 !important;
+
+                  /* 輕微毛玻璃，讓地圖紋理不搶眼（支援瀏覽器才會生效） */
+                  -webkit-backdrop-filter: blur(2px);
+                  backdrop-filter: blur(2px);
+
+                  /* 形狀與間距 */
+                  border-radius: 10px !important;
+                  padding: 6px 12px !important;
+                  font-weight: 600;
+
+                  /* 移除瀏覽器/Bootstrap 遺留外觀 */
+                  background-image: none !important;
+                  box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important;
+                  outline: none !important;
+                  -webkit-appearance: none !important;
+                  -moz-appearance: none !important;
+                  appearance: none !important;
+
+                  /* 動畫回饋 */
+                  transition: background .15s ease, box-shadow .15s ease, transform .05s ease;
+                }}
+
+                /* 滑過更清楚一點 */
+                button:hover, .btn:hover {{
+                  background: rgba(255,255,255,0.30) !important;
+                  box-shadow: 0 2px 6px rgba(0,0,0,0.25) !important;
+                }}
+
+                /* 點下去有壓下感 */
+                button:active, .btn:active {{
+                  transform: translateY(1px);
+                }}
+
+                /* 鍵盤可及性：聚焦外框（不會改變透明感） */
+                button:focus-visible, .btn:focus-visible {{
+                  box-shadow: 0 0 0 3px rgba(0,123,255,0.35) !important;
+                }}
+                </style>
+                <div>
                     <b>{name}</b><br>
                     <b>{row['Opentime']}</b><br>
                     <b>{row['Add']}</b><br>
@@ -378,14 +592,16 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
                     <b>{row['Px']}(景點X座標)</b><br>
                     <b>{row['Py']}(景點Y座標)</b><br>
                     <b>{row['Changetime']}(資料異動時間)</b><br><br>
-                    <button style="width: 100%;" onclick="openWindow('upload', '{id_}', '{name}', '{server_ip}')">上傳照片</button><br><br>
-                    <button style="width: 100%;" onclick="openWindow('download', '{id_}', '{name}', '{server_ip}')">下載照片</button><br><br>
-                    <button style="width: 100%;" onclick="openWindow('edit', '{id_}', '{name}', '{server_ip}')">填寫相關資訊</button>
+                    <button onclick="openWindow('upload', '{id_}', '{name}', '{server_ip}')">上傳照片</button><br><br>
+                    <button onclick="openWindow('download', '{id_}', '{name}', '{server_ip}')">下載照片</button><br><br>
+                    <button onclick="openWindow('edit', '{id_}', '{name}', '{server_ip}')">填寫相關資訊</button>
+                </div>
                 <script>
                         function openWindow(action, locationId, name, server_ip) {{
                             let url = '';
                             // let customedomain='https://ntgisgithubio-production.up.railway.app';  //114/01/21 modified
-                            let customedomain='https://ntgis.zeabur.app';
+                            // let customedomain='https://ntgis.zeabur.app';
+                            let customedomain=`http://${{server_ip}}:8799`;
                             if (action === "upload") {{
                               // url = `http://${{server_ip}}:8799/static/upload.html?id=${{locationId}}&name=${{name}}`;
                                 url = `${{customedomain}}/static/upload.html?id=${{locationId}}&name=${{name}}`;
@@ -449,9 +665,38 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
                     //}}
                     //mymap.on("zoomend", updatePopupSize);
                 </script>
-            </div>
+                </body></html>
             """
             ##
+            ###
+            # 注入 CSS
+            css = """
+            <style>
+            .leaflet-popup-content-wrapper {
+                background: rgba(255,255,255,0.6) !important; /* 半透明白底 */
+                color: #000 !important; /* 黑色字 */
+                font-weight: 500;       /* 稍微加粗，增強對比 */
+            }
+            .leaflet-popup-content,
+            .leaflet-popup-content * {
+                color: #000 !important;
+                text-shadow: 0px 0px 3px rgba(255, 255, 255, 0.8);
+            }
+            .leaflet-popup-tip {
+                background: rgba(255,255,255,0.6) !important;
+            }
+            /* 強制覆蓋 Bootstrap 的 .btn */
+            /* .leaflet-popup-content button,
+            .leaflet-popup-content .btn {
+                background-color: transparent !important;
+                color: red !important;
+                border: 1px solid black !important;
+                box-shadow: none !important;
+            } */
+            </style>
+            """
+            mymap.get_root().html.add_child(Element(css))
+            ###
             #marker_cluster.add_child(Marker([row['Py'], row['Px']]))
             ##
             #print("(create_map1) popup_html= ", popup_html)
@@ -460,7 +705,8 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
             #iframe = branca.element.IFrame(popup_html)
             # iframe = branca.element.IFrame(popup_html, width=200, height=180)
             # iframe = branca.element.IFrame(popup_html, width=200, height=220)
-            iframe = branca.element.IFrame(popup_html, width=window_width*0.25, height=220)
+            # iframe = branca.element.IFrame(popup_html, width=window_width*0.25, height=220)
+            iframe = branca.element.IFrame(popup_html, width=window_width*0.25, height=280)
             # popup = folium.Popup(iframe, max_width="auto")
             # popup = folium.Popup(iframe, max_width=200)
             popup = folium.Popup(iframe, max_width=window_width*0.25)
@@ -504,7 +750,7 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
         # vp_dropdown_options = []
 
     #return map_html, error_msg, vp_dropdown_options
-    return f"(斷點名稱: {breakpoint_name} 視窗寬度: {window_width} px)", map_html, error_msg, no_update     # vp_dropdown_options 保持現值，不改變
+    return f"(斷點名稱: {breakpoint_name} 視窗寬度: {window_width} px)", map_html, error_msg
     # return map_html, error_msg, vp_dropdown_options
     #return map_html, error_msg 
     

@@ -11,23 +11,26 @@ import dash_bootstrap_components as dbc
 from geopy.geocoders import Nominatim
 import geopandas as gpd
 import pandas as pd
-from userdefinefun import get_unique_zip_area_df
+from userdefinefun import get_tourist_data, get_unique_zip_area_df
 from userdefinefun import create_map1, create_map2
 from userdefinefun import style_function
 from userdefinefun import create_vp_dropdown_options
+from userdefinefun import _load_layer_to_4326
 from dash import no_update
 from flask import request
 from flask_cors import CORS
 from flask import jsonify
 
+# df = pd.read_csv('static/Scenic_Spot_C_f_filled1拷貝2_至3198.csv', encoding='utf-8')
+# df = get_tourist_data()
 # 移除重複的郵遞區號及區域名稱組合，並進行排序
-unique_zip_area = get_unique_zip_area_df()
+# unique_zip_area = get_unique_zip_area_df()
 
 # 將資料轉換為 Dash 下拉選單格式
-dropdown_options = [
-    {'label': f"{row['郵遞區號']} {row['區域名稱']}", 'value': row['郵遞區號']}
-    for _, row in unique_zip_area.iterrows()
-]
+# dropdown_options = [
+#     {'label': f"{row['郵遞區號']} {row['區域名稱']}", 'value': row['郵遞區號']}
+#     for _, row in unique_zip_area.iterrows()
+# ]
 
 # 將景點名稱資料轉換為 Dash 下拉選單格式
 # 讀取 "新北市觀光旅遊景點(中文).csv" 檔案
@@ -66,13 +69,26 @@ server_ip = get_host_ip()
 # 自定義樣式函數
 def create_map(breakpoint_name,name,window_width):
     
-    # 讀取大台北鄉鎮市區界圖shpe file(含台北市、新北市)
+    # 讀取讀取全國鄉鎮市區界圖shpe file
     # Big_Taipei_data = gpd.read_file('static/shapefiles/Taipei.shp', encoding='utf-8')
-    shapefile_path = os.path.join(os.path.dirname(__file__), 'static', 'shapefiles', 'Taipei.shp')
-    Big_Taipei_data = gpd.read_file(shapefile_path, encoding='utf-8')
-    Ｎew_Taipei_data = Big_Taipei_data[(Big_Taipei_data['COUNTYNAME']=='新北市')]
-    
+    # shapefile_path = os.path.join(os.path.dirname(__file__), 'static', 'shapefiles', 'Taipei.shp')
+    #shapefile_path = os.path.join(os.path.dirname(__file__), 'static', 'shapefiles', 'TOWN_MOI_1140318.shp')
+    # Big_Taipei_data = gpd.read_file(shapefile_path, encoding='utf-8')
+    # Ｎew_Taipei_data = Big_Taipei_data[(Big_Taipei_data['COUNTYNAME']=='新北市')]
+    #Domestic_data = gpd.read_file(shapefile_path, encoding='utf-8')
+    # County_data = Domestic_data[(Domestic_data['COUNTYNAME']=='南投縣')]
     ##
+    # 額外讀取屏東縣瑪家鄉三和村shape file
+    shapefile_path = os.path.join(os.path.dirname(__file__), 'static', 'shapefiles', 'Town_Majia_Sanhe.shp')
+    Sanhe_data = gpd.read_file(shapefile_path, encoding='utf-8')
+     # 讀取全國鄉鎮市區界圖及屏東縣瑪家鄉三和村shape file
+    base_dir = os.path.dirname(__file__)
+    town_shp = os.path.join(base_dir, "static", "shapefiles", "TOWN_MOI_1140318.shp")
+    sanhe_shp = os.path.join(base_dir, "static", "shapefiles", "Town_Majia_Sanhe.shp")
+
+    # === 讀檔並確保是 WGS84 ===
+    Domestic_gdf = _load_layer_to_4326(town_shp)      # 鄉鎮市區界
+    Sanhe_gdf    = _load_layer_to_4326(sanhe_shp)     # 三和村（專屬 shapefile)
     # 設定地圖中心點和縮放級別，這裡以新北市的經緯度為例
     map_center = [24.989868, 121.656173]  # 新北市中心位置約在石碇區石碇里
 
@@ -90,24 +106,76 @@ def create_map(breakpoint_name,name,window_width):
     #popup=getLoc.address + '\n' + str(getLoc.latitude) + '\n' + str(getLoc.longitude) 
     #
     if getLoc is not None:
-        if name != "石碇區石碇里":
+        if name != "台灣地理中心碑":
            popup="<div style='font-size: 24px;'>" +getLoc.address + "<br>" + str(getLoc.latitude) + "<br>" + str(getLoc.longitude) + "</div>"
         else:
-            popup="<div style='font-size: 24px;'>" + "新北市中心位置：" + "<br>" + getLoc.address + "<br>" + str(getLoc.latitude) + "<br>" + str(getLoc.longitude) + "</div>"
+            popup="<div style='font-size: 24px;'>" + "台灣地理中心位置：" + "<br>" + getLoc.address + "<br>" + str(getLoc.latitude) + "<br>" + str(getLoc.longitude) + "</div>"
 
         mymap = folium.Map(location=[getLoc.latitude, getLoc.longitude], zoom_start=12)
         Marker([getLoc.latitude, getLoc.longitude], popup=popup, icon=folium.Icon(color="red")).add_to(mymap)
         # 將 Shapefile 轉為 GeoJSON 並添加到地圖
-        folium.GeoJson(New_Taipei_data, style_function=style_function).add_to(mymap)
+        #folium.GeoJson(Domestic_data, style_function=style_function).add_to(mymap)
+        #folium.GeoJson(Sanhe_data, style_function=style_function).add_to(mymap)
+        # === 疊鄉鎮界（灰線、很淡底色） ===
+        # 欄位常見：COUNTYNAME / TOWNNAME
+        # folium.GeoJson(
+        #     Domestic_gdf[["COUNTYNAME","TOWNNAME","geometry"]],
+        #     name="鄉鎮市區界",
+        #     # style_function=lambda x: {"fillOpacity": 0.03, "color": "#666", "weight": 1},
+        #     style_function=lambda x: {"fillOpacity": 0.00, "color": "#666", "weight": 0},
+        #     tooltip=folium.GeoJsonTooltip(
+        #         fields=["COUNTYNAME","TOWNNAME"], aliases=["縣市","鄉鎮市區"], sticky=False
+        #     ),
+        # ).add_to(mymap)
+
+        # === 疊三和村（橘色高亮） ===
+        # 村里欄位常見：VILLNAME（有就顯示，沒有就只顯示縣市/鄉鎮）
+        vill_col = "VILLNAME" if "VILLNAME" in Sanhe_gdf.columns else None
+        tooltip_fields = ["COUNTYNAME","TOWNNAME"] + ([vill_col] if vill_col else [])
+        tooltip_alias  = ["縣市","鄉鎮市區"] + (["村里"] if vill_col else [])
+
+        folium.GeoJson(
+            Sanhe_gdf[tooltip_fields + ["geometry"]] if tooltip_fields else Sanhe_gdf,
+            name="屏東縣瑪家鄉三和村",
+            style_function=lambda x: {"fillColor": "#ffa500", "color": "#ffa500", "weight": 3, "fillOpacity": 0.5},
+            tooltip=folium.GeoJsonTooltip(fields=tooltip_fields, aliases=tooltip_alias, sticky=False) if tooltip_fields else None,
+        ).add_to(mymap)
         error_msg=""
     else:
         getLoc = loc.geocode(name)
         if getLoc is not None:
-            popup=getLoc.address + "<br>" + str(getLoc.latitude) + "<br>" + str(getLoc.longitude)
+            # popup=getLoc.address + "<br>" + str(getLoc.latitude) + "<br>" + str(getLoc.longitude)
+            popup="<div style='font-size: 24px;'>" +getLoc.address + "<br>" + str(getLoc.latitude) + "<br>" + str(getLoc.longitude) + "</div>"
             mymap = folium.Map(location=[getLoc.latitude, getLoc.longitude], zoom_start=12)
-            Marker([getLoc.latitude, getLoc.longitude], popup=popup).add_to(mymap)
+            # Marker([getLoc.latitude, getLoc.longitude], popup=popup).add_to(mymap)
+            Marker([getLoc.latitude, getLoc.longitude], popup=popup, icon=folium.Icon(color="red")).add_to(mymap)
             # 將 Shapefile 轉為 GeoJSON 並添加到地圖
-            folium.GeoJson(New_Taipei_data, style_function=style_function).add_to(mymap)
+            #folium.GeoJson(Domestic_data, style_function=style_function).add_to(mymap)
+            #folium.GeoJson(Sanhe_data, style_function=style_function).add_to(mymap)
+            # === 疊鄉鎮界（灰線、很淡底色） ===
+            # 欄位常見：COUNTYNAME / TOWNNAME
+            # folium.GeoJson(
+            #     Domestic_gdf[["COUNTYNAME","TOWNNAME","geometry"]],
+            #     name="鄉鎮市區界",
+            #     # style_function=lambda x: {"fillOpacity": 0.03, "color": "#666", "weight": 1},
+            #     style_function=lambda x: {"fillOpacity": 0.00, "color": "#666", "weight": 0},
+            #     tooltip=folium.GeoJsonTooltip(
+            #         fields=["COUNTYNAME","TOWNNAME"], aliases=["縣市","鄉鎮市區"], sticky=False
+            #     ),
+            # ).add_to(mymap)
+
+            # === 疊三和村（橘色高亮） ===
+            # 村里欄位常見：VILLNAME（有就顯示，沒有就只顯示縣市/鄉鎮）
+            vill_col = "VILLNAME" if "VILLNAME" in Sanhe_gdf.columns else None
+            tooltip_fields = ["COUNTYNAME","TOWNNAME"] + ([vill_col] if vill_col else [])
+            tooltip_alias  = ["縣市","鄉鎮市區"] + (["村里"] if vill_col else [])
+
+            folium.GeoJson(
+                Sanhe_gdf[tooltip_fields + ["geometry"]] if tooltip_fields else Sanhe_gdf,
+                name="屏東縣瑪家鄉三和村",
+                style_function=lambda x: {"fillColor": "#ffa500", "color": "#ffa500", "weight": 3, "fillOpacity": 0.5},
+                tooltip=folium.GeoJsonTooltip(fields=tooltip_fields, aliases=tooltip_alias, sticky=False) if tooltip_fields else None,
+            ).add_to(mymap)
             error_msg=""
         else:
             mymap = folium.Map(location=map_center, zoom_start=12)
@@ -129,7 +197,7 @@ def create_map(breakpoint_name,name,window_width):
     map_html = map_io.getvalue().decode()
 
     # return map_html, error_msg, []
-    return f"(斷點名稱: {breakpoint_name} 視窗寬度: {window_width} px)", map_html, error_msg, no_update 
+    return f"(斷點名稱: {breakpoint_name} 視窗寬度: {window_width} px)", map_html, error_msg 
 
 # 全域變數
 # g_width = 1000  # 預設寬度
@@ -140,30 +208,14 @@ app.layout = dbc.Container([
             html.Div(id='window-size-display'),
             WindowBreakpoints(
                 id="breakpoints",
-                # Define the breakpoint thresholds
-                # widthBreakpointThresholdsPx=[800, 1200],
                 widthBreakpointThresholdsPx=[575, 767, 991, 1199],
-                # And their name, note that there is one more name than breakpoint thresholds
                 widthBreakpointNames=["xs", "sm", "md", "lg", "xl"],
             ),
-            # html.Div([
-            #     html.Span("目前視窗寬度: "),
-            #     html.Span(id='width-display')
-            # ]),
-            #  dcc.Interval(id="init-load-trigger", interval=100, n_intervals=0, max_intervals=1),
-            #  dcc.Interval(id="init-load-trigger", interval=1000, n_intervals=0, max_intervals=1),
-            # dcc.Interval(id='interval', interval=1000, n_intervals=0)  # 為了觸發第一次 clientside callback
-            # dcc.Interval(id='interval', interval=1000, n_intervals=0, max_intervals=1),  # 為了觸發第一次 clientside callback
-            # html.Div(id='dummy-trigger', style={'display': 'none'}),
-            # html.Div([
-            #     html.Span("目前視窗寬度: "),
-            #    fun html.Span(id='width',value=0)   
-            # ]),
             html.Div([
                 dcc.Location(id='url', refresh=False),
                 html.Div(id='page-content')
             ]),
-            html.H4("互動式GIS系統2.0", className='text-center mb-4'),
+            html.H4("互動式GIS系統3.0", className='text-center mb-4'),
             dbc.Label("請輸入世界各地任一地點名稱:"),
             dcc.Input(id='name-input', type='text', value=""),            
             html.Br(),
@@ -171,26 +223,34 @@ app.layout = dbc.Container([
             dbc.Label("-----------------------------------"),
             html.Br(),
             html.Div([
-                html.Label("新北市觀光旅遊景點位置查詢"),
-                html.Label("點選新北市郵遞區號及區域名稱"),
-                html.Br(),
+                html.Label("全國觀光旅遊景點位置查詢"),
                 dcc.Dropdown(
-                    id='zip-area-dropdown',
-                    options=dropdown_options,
-                    placeholder="選擇新北市郵遞區號及區域名稱",
+                    options=[
+                        {'label': '北部', 'value': '北部'},
+                        {'label': '中部', 'value': '中部'},
+                        {'label': '南部', 'value': '南部'},
+                        {'label': '東部', 'value': '東部'},
+                        {'label': '外島', 'value': '外島'},
+                    ],
+                    id='location-dropdown',
+                    placeholder="點選任一位置別",
                 ),
+                html.Div(id='dd-output-container'),
+                dcc.Dropdown(
+                    id='city-dropdown',
+                    placeholder="選擇縣市別",
+                ),
+                dcc.Dropdown(
+                    id='district-dropdown',
+                    placeholder="選擇鄉鎮市區別",
+                ),
+                dcc.Dropdown(
+                    id='scenicspot-dropdown',
+                    placeholder="選擇景點別",
+                ),
+                html.Br(),
+                dbc.Button("繪製地圖(國內範圍)", id="generate-map-btn2", color="primary", className="mt-2"),
             ]),
-            dbc.Button("繪製地圖(新北市範圍)", id="generate-map-btn2", color="primary", className="mt-2"),
-            #dbc.Button("區景點瀏覽", id="viewpoint-qry-btn", color="primary", className="mt-2"),
-            html.Br(),
-            html.Br(),
-            dcc.Dropdown(
-                id='viewpoint-dropdown',
-                #   options=vp_dropdown_options,
-                placeholder="選擇區內景點名稱",
-            ),
-            html.Br(),
-            #html.Div(id='error-message', style={'color': 'red', 'margin-top': '10px'}),
             html.Div(id='error-message', style={'color': 'red', 'marginTop': '10px'}),
         ], width=3, className="dash-col-left"),
         dbc.Col([
@@ -213,13 +273,141 @@ app.layout = dbc.Container([
 # )
 # def show_current_breakpoint(breakpoint_name: str, window_width: int):
     # return f"斷點名稱: {breakpoint_name}, 視窗寬度: {window_width}px"
+###
+@app.callback(
+    # Output('dd-output-container', 'children'),
+    Output('city-dropdown', 'options'),  # 輸出縣市選項
+    Output('district-dropdown', 'options'),  # 輸出鄉鎮市區選項
+    Output('scenicspot-dropdown', 'options'),  # 輸出景點選項
+    Input('location-dropdown', 'value'),
+    Input('city-dropdown', 'value'),
+    Input('district-dropdown', 'value'),
+    Input('scenicspot-dropdown', 'value'),
 
+)
+def update_output(location_value, city_value, district_value, scenicspot_value):
+    city_options = []
+    district_options = []
+    scenicspot_options = []
+
+    if location_value == '北部':
+        city_options = [
+            {'label': '基隆市', 'value': '基隆市'},
+            {'label': '臺北市', 'value': '臺北市'},
+            {'label': '新北市', 'value': '新北市'},
+            {'label': '桃園市', 'value': '桃園市'},
+            {'label': '新竹市', 'value': '新竹市'},
+            {'label': '新竹縣', 'value': '新竹縣'},
+            {'label': '苗栗縣', 'value': '苗栗縣'},
+        ]
+    elif location_value == '中部':
+        city_options = [
+            {'label': '臺中市', 'value': '臺中市'},
+            {'label': '彰化縣', 'value': '彰化縣'},
+            {'label': '南投縣', 'value': '南投縣'},
+        ]
+    elif location_value == '南部':
+        city_options = [
+            {'label': '雲林縣', 'value': '雲林縣'},
+            {'label': '嘉義市', 'value': '嘉義市'},
+            {'label': '嘉義縣', 'value': '嘉義縣'},
+            {'label': '臺南市', 'value': '臺南市'},
+            {'label': '高雄市', 'value': '高雄市'},
+            {'label': '屏東縣', 'value': '屏東縣'},
+        ]
+    elif location_value == '東部':
+        city_options = [
+            {'label': '宜蘭縣', 'value': '宜蘭縣'},
+            {'label': '花蓮縣', 'value': '花蓮縣'},
+            {'label': '臺東縣', 'value': '臺東縣'},
+        ]
+    elif location_value == '外島':
+        city_options = [
+            {'label': '金門縣', 'value': '金門縣'},
+            {'label': '連江縣', 'value': '連江縣'},
+            {'label': '澎湖縣', 'value': '澎湖縣'},
+        ]
+
+    if city_value is not None and city_value != '':
+        # 處理空白與格式
+        # df['Region'] = df['Region'].astype(str).str.strip()
+        # df['Town'] = df['Town'].astype(str).str.strip()
+        
+        df = get_tourist_data()  # 確保使用最新的資料
+        # Debug 輸出
+        print("選到的縣市:", city_value)
+        print("Region 唯一值：", df['Region'].unique())
+
+        # 過濾符合地區的鄉鎮市區
+        filtered_df = df[df['Region'] == city_value]
+        print("找到筆數：", len(filtered_df))
+
+        if len(filtered_df) > 0:
+            # selected_df = filtered_df[['Town']].dropna().drop_duplicates().reset_index(drop=True)
+            selected_df = filtered_df[['Zipcode','Town']].dropna().drop_duplicates().reset_index(drop=True)
+            options = [{'label': town, 'value': town} for town in selected_df['Town']]
+        else:
+            options = []  # 無符合資料
+
+        selected_df = df[df['Region'] == city_value][['Zipcode','Town']].dropna().drop_duplicates().reset_index(drop=True)
+        # 獲取選擇的縣市對應的鄉鎮市區選項
+        district_options = [
+            {'label': f"{idx+1} {row['Zipcode']} {row['Town']}", 'value': row['Zipcode']}
+            for idx, row in selected_df.iterrows()
+        ]
+    else:
+        district_options = []
+        district_value = None  # 重置鄉鎮市區選擇
+        scenicspot_options = []
+        scenicspot_value = None  # 重置景點選擇
+
+    if district_value is not None and district_value != '':
+        print("選到的鄉鎮市區:", district_value)
+        # print("Town 唯一值：", df['Town'].unique())
+
+        # 過濾符合鄉鎮市區的景點
+        # filtered_df = df[df['Zipcode'] == district_value]
+        # print("找到筆數：", len(filtered_df))
+
+        # if len(filtered_df) > 0:
+        #     selected_df = filtered_df[['ScenicSpot']].dropna().drop_duplicates().reset_index(drop=True)
+        #     scenicspot_options = [{'label': spot, 'value': spot} for spot in selected_df['ScenicSpot']]
+        # else:
+        #     scenicspot_options = []  # 無符合資料
+
+        # 篩選對應的 Zipcode 資料，並依 Name 排序
+        selected_df = (
+            df[df['Zipcode'] == district_value][['Name']]
+            .dropna()
+            .drop_duplicates()
+            .sort_values(by='Name')   # 依 Name 欄位排序
+            .reset_index(drop=True)
+        )
+
+        print("找到筆數：", len(selected_df))
+
+        # 建立景點下拉選項
+        scenicspot_options = [
+            {'label': f"{idx+1} {row['Name']}", 'value': row['Name']}
+            for idx, row in selected_df.iterrows()
+        ]
+    else:
+        scenicspot_options = []
+        scenicspot_value = None  # 重置景點選擇
+
+    if scenicspot_value is not None and scenicspot_value != '':
+        print("選到的景點:", scenicspot_value)
+        # 這裡可以根據需要進行進一步的處理
+        #      
+    return city_options, district_options, scenicspot_options
+
+###
 # Callback 更新地圖
 @app.callback(
     Output("window-size-display", "children"),
     Output('map', 'srcDoc'), 
     Output('error-message', 'children'),
-    Output('viewpoint-dropdown', 'options'),  # 更新地圖和錯誤訊息
+    # Output('viewpoint-dropdown', 'options'),  # 更新地圖和錯誤訊息
     #[Input('generate-map-btn', 'n_clicks')],
     #[Input('latitude-input', 'value'), Input('longitude-input', 'value')]
     Input("breakpoints", "widthBreakpoint"),
@@ -228,16 +416,17 @@ app.layout = dbc.Container([
     Input('generate-map-btn1', 'n_clicks'),  # 按鈕點擊事件觸發
                                              # 使用 Input 監聽按鈕點擊事件：按鈕的點擊事件觸發地圖更新。
     Input('generate-map-btn2', 'n_clicks'), 
-    Input('zip-area-dropdown', 'value'),
+    # Input('zip-area-dropdown', 'value'),
     State('name-input', 'value'),   # 名稱或地址 # 使用 State 來儲存緯度和經度數值：避免在按鈕點擊之前緯度和經度變化時觸發回調。
-    State('viewpoint-dropdown', 'value'),
+    State('district-dropdown', 'value'),
+    State('scenicspot-dropdown', 'value'),
     State("breakpoints", "width")
 
     # State('st-width', 'data')
     #state('viewpoint-dropdown', 'value')
 )
 ##
-def update_map_and_dropdown(breakpoint_name: str, map_clicks1, map_clicks2, zipcode, name, viewpoint, window_width: int):
+def update_map_and_dropdown(breakpoint_name: str, map_clicks1, map_clicks2, name, district, scenicspot, window_width: int):
                            
     # ***** Initialize default values
     #map_html = "<p>No map data available.</p>"  # Default or empty map HTML
@@ -247,27 +436,28 @@ def update_map_and_dropdown(breakpoint_name: str, map_clicks1, map_clicks2, zipc
     ctx = dash.callback_context  # 用於判斷哪個輸入觸發了回調
     triggered_input = ctx.triggered[0]['prop_id'].split('.')[0]
     # 如果是 zip-area-dropdown 觸發的回調，更新 viewpoint-dropdown 的選項
-    if triggered_input == 'zip-area-dropdown':
-        return create_vp_dropdown_options(breakpoint_name,zipcode,window_width) 
-    elif triggered_input in ['generate-map-btn1', 'generate-map-btn2']:
+    # if triggered_input == 'zip-area-dropdown':
+    #     return create_vp_dropdown_options(breakpoint_name,zipcode,window_width) 
+    if triggered_input in ['generate-map-btn1', 'generate-map-btn2']:
     # 當按鈕點擊後，根據 name 和 zipcode 判斷要生成哪種地圖
         if name:
             if map_clicks1 is not None:
                 return create_map(breakpoint_name,name,window_width)  # 優先使用 name
-        elif zipcode:
+        elif district:
             if map_clicks2 is not None:
-                if not viewpoint: 
-                    return create_map1(breakpoint_name,zipcode,server_ip,window_width)
+                if not scenicspot: 
+                    return create_map1(breakpoint_name,district,server_ip,window_width)
                     print("trace 1 on create_map1")
                 else:
-                    return create_map2(breakpoint_name,zipcode,viewpoint,server_ip,window_width)
+                    return create_map2(breakpoint_name,district,scenicspot,server_ip,window_width)
                     # else:
                         # return no_update, no_update, no_update 
         else:
-            return f"(斷點名稱: {breakpoint_name} 視窗寬度: {window_width} px)",no_update, no_update, no_update   # 必須
+            return f"(斷點名稱: {breakpoint_name} 視窗寬度: {window_width} px)",no_update, no_update   # 必須
     else:
         # 初始狀態，當 n_clicks 為 None 時顯示默認地圖
-        name = name if name else "石碇區石碇里"  # 預設地點
+        # name = name if name else "石碇區石碇里"  # 預設地點
+        name = name if name else "台灣地理中心碑"  # 預設地點
         return create_map(breakpoint_name,name,window_width)
             
                 

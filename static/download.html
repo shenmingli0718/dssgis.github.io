@@ -126,9 +126,9 @@
 
             // 調用後端API獲取照片目錄
             try {
-                // const response = await fetch(`http://localhost:3000/uploads?id=${subid}`);
+                const response = await fetch(`http://localhost:3000/uploads?id=${subid}`);
                 // const response = await fetch(`https://ntgisapigithubio-production.up.railway.app/uploads?id=${subid}`);
-                const response = await fetch(`https://ntgisapi.zeabur.app/uploads?id=${subid}`);
+                // const response = await fetch(`https://ntgisapi.zeabur.app/uploads?id=${subid}`);
                 if (!response.ok) {
                     throw new Error('無法獲取照片目錄');
                 }
@@ -164,7 +164,9 @@
             // previewImage.src = `/app/static/uploads/${subid}/${filename}`;
             // preview/${subid}/${filename}
             // previewImage.src = `https://ntgisapigithubio-production.up.railway.app/previewimage/${subid}/${filename}`;
-            previewImage.src = `https://ntgisapi.zeabur.app/previewimage/${subid}/${filename}`;
+            // previewImage.src = `https://ntgisapi.zeabur.app/previewimage/${subid}/${filename}`;
+            // previewImage.src = `https://ntgisapi.zeabur.app/previewimage/${subid}/${filename}`;
+            previewImage.src = `http://localhost:3000/previewimage/${subid}/${filename}`;
             previewModal.style.display = 'flex';
         }
 
@@ -213,9 +215,9 @@
         //}
         //**
         async function downloadFile(filename) {
-            // const downloadUrl = `http://localhost:3000/uploads/${subid}/${filename}`; // 檢查這個 URL 是否正確
+            const downloadUrl = `http://localhost:3000/uploads/${subid}/${filename}`; // 檢查這個 URL 是否正確
             // const downloadUrl = `https://ntgisapigithubio-production.up.railway.app/uploads/${subid}/${filename}`; // 檢查這個 URL 是否正確
-            const downloadUrl = `https://ntgisapi.zeabur.app/uploads/${subid}/${filename}`; // 檢查這個 URL 是否正確
+            // const downloadUrl = `https://ntgisapi.zeabur.app/uploads/${subid}/${filename}`; // 檢查這個 URL 是否正確
 
             try {
                 const response = await fetch(downloadUrl, { method: 'GET' });
