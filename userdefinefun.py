@@ -33,7 +33,8 @@ def get_tourist_data():
     if API_URL is None or API_URL.strip() == "":
 ##      API_URL = "https://ntgisapigithubio-production.up.railway.app"
         # API_URL = "https://ntgisapi.zeabur.app"
-        API_URL = "http://localhost:3000"
+        # API_URL = "http://localhost:3000"
+        API_URL = "https://dssgisapi-github-io.onrender.com"
 
 
     API_URL = API_URL + "/get_tourist_data"
