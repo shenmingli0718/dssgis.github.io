@@ -86,7 +86,8 @@
     // 使用 async/await 加載欄位資訊
     async function loadFields() {
       try {
-        const response = await fetch(`http://localhost:3000/api/get-fields?PlaceID=${params.id}`);
+        // const response = await fetch(`http://localhost:3000/api/get-fields?PlaceID=${params.id}`);
+        const response = await fetch(`https://dssgisapi-github-io.onrender.com/api/get-fields?PlaceID=${params.id}`);
         // const response = await fetch(`https://ntgisapigithubio-production.up.railway.app/api/get-fields?PlaceID=${params.id}`);
         // const response = await fetch(`https://ntgisapi.zeabur.app/api/get-fields?PlaceID=${params.id}`);
         if (!response.ok) {
@@ -164,7 +165,8 @@
       });
 
       try {
-        const response = await fetch('http://localhost:3000/api/update-csv', {
+        // const response = await fetch('http://localhost:3000/api/update-csv', {
+        const response = await fetch('https://dssgisapi-github-io.onrender.com/api/update-csv', {  
         // const response = await fetch('https://ntgisapigithubio-production.up.railway.app/api/update-csv', {
         // const response = await fetch('https://ntgisapi.zeabur.app/api/update-csv', {
           method: 'POST',
