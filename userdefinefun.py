@@ -24,26 +24,26 @@ def style_function(feature):
         'fillOpacity': 0.5,
     }
 ##
-def get_tourist_data():
-    import requests
-    import pandas as pd
-    import os
+# def get_tourist_data():
+#     import requests
+#     import pandas as pd
+#     import os
 
-    API_URL = os.getenv("API_URL")
-    if API_URL is None or API_URL.strip() == "":
-##      API_URL = "https://ntgisapigithubio-production.up.railway.app"
-        # API_URL = "https://ntgisapi.zeabur.app"
-        # API_URL = "http://localhost:3000"
-        API_URL = "https://dssgisapi-github-io.onrender.com"
+#     API_URL = os.getenv("API_URL")
+#     if API_URL is None or API_URL.strip() == "":
+# ##      API_URL = "https://ntgisapigithubio-production.up.railway.app"
+#         # API_URL = "https://ntgisapi.zeabur.app"
+#         # API_URL = "http://localhost:3000"
+#         API_URL = "https://dssgisapi-github-io.onrender.com"
 
 
-    API_URL = API_URL + "/get_tourist_data"
-    print(f"Fetching data from: {API_URL}")  # Debugging output
+#     API_URL = API_URL + "/get_tourist_data"
+#     print(f"Fetching data from: {API_URL}")  # Debugging output
 
-    response = requests.get(API_URL)
-    if response.status_code == 200:
-        data = response.json()
-        df = pd.DataFrame(data)  # Normal case
+#     response = requests.get(API_URL)
+#     if response.status_code == 200:
+#         data = response.json()
+#         df = pd.DataFrame(data)  # Normal case
         # print("DataFrame Columns:", df.columns)  # Debugging output
         # print("First few rows:\n", df.head())  # Debugging output
         
@@ -72,13 +72,38 @@ def get_tourist_data():
 ##        print("DataFrame Columns:", df.columns)  # Debugging output
 ##        print("First few rows:\n", df.head())  # Debugging output
         
-        if 'Zipcode' not in df.columns:
-            raise KeyError("Missing 'Zipcode' column in API response")
+    #     if 'Zipcode' not in df.columns:
+    #         raise KeyError("Missing 'Zipcode' column in API response")
 
+    #     return df
+    # else:
+    #     print("Failed to fetch 全國觀光旅遊景點檔")
+    #     return pd.DataFrame()
+
+def get_tourist_data():
+    import pandas as pd
+    import os
+    from pathlib import Path
+
+    base_dir = Path(__file__).resolve().parent
+
+    # 優先讀 Render Disk（/data），沒有才讀 static（方便本機測試）
+    disk_csv = Path("/data") / "Scenic_Spot_C_f_filled1拷貝2_至3814.csv"
+    static_csv = base_dir / "static" / "Scenic_Spot_C_f_filled1拷貝2_至3814.csv"
+    csv_path = disk_csv if disk_csv.exists() else static_csv
+
+    try:
+        df = pd.read_csv(csv_path, encoding="utf-8-sig")
+        # 你的下游很多地方用 Zipcode 比對，保險起見轉字串
+        if "Zipcode" in df.columns:
+            df["Zipcode"] = df["Zipcode"].astype(str).str.strip()
+        if "Name" in df.columns:
+            df["Name"] = df["Name"].astype(str).str.strip()
         return df
-    else:
-        print("Failed to fetch 全國觀光旅遊景點檔")
+    except Exception as e:
+        print("Failed to read tourist CSV:", e)
         return pd.DataFrame()
+
 
 def create_vp_dropdown_options(breakpoint_name, zipcode,window_width):
     import pandas as pd
