@@ -47,6 +47,244 @@ app = dash.Dash(__name__, meta_tags=[
                 {"name": "viewport", "content": "width=device-width, initial-scale=1"}
             ], external_stylesheets=[dbc.themes.BOOTSTRAP], suppress_callback_exceptions=True)
 server=app.server   # gunicorn int_gis_use_dash:server --bind 0.0.0.0:8799
+# === Flask routes: CSV + upload/download (migrated from server.js) ===
+import csv
+import shutil
+from datetime import datetime
+from pathlib import Path
+from flask import request, jsonify, send_file, Response
+
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+
+# 你的 CSV 與 uploads 都在 2025_aut_Python_proj/static 下
+CSV_FILE = Path(os.environ.get("CSV_FILE", str(STATIC_DIR / "Scenic_Spot_C_f_filled1拷貝2_至3814.csv")))
+UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", str(STATIC_DIR / "uploads")))
+MAX_FOLDER_SIZE_MB = float(os.environ.get("MAX_FOLDER_SIZE_MB", "400"))
+
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# 依 server.js 的 fieldMapping 直接搬過來（重複 key 在 Python dict 會以最後一次為準）
+fieldMapping = {
+    "Name": "景點名稱",
+    "Zone": "景點所屬景區編號",
+    "Toldescribe": "景點特色文字詳述",
+    "Description": "景點特色文字簡述",
+    "Tel": "景點服務電話",
+    "Add": "景點地址",
+    "Zipcode": "郵遞區號",
+    "Region": "景點所屬行政區域",
+    "Town": "景點所屬行政區域之鄉鎮市區",
+    "Travellinginfo": "交通資訊描述",
+    "Opentime": "開放時間",
+    "Picture1": "景點圖片網址1",
+    "Picdescribe1": "景點圖片說明1",
+    "Picture2": "景點圖片網址2",
+    "Picdescribe2": "景點圖片說明2",
+    "Picture3": "景點圖片網址3",
+    "Picdescribe3": "景點圖片說明3",
+    "Map": "景點地圖介紹網址",
+    "Gov": "景點管理權責單位代碼",
+    "Px": "景點X座標",
+    "Py": "景點Y座標",
+    "Orgclass": "景點分類說明",
+    "Class1": "景點分類代碼1",
+    "Class2": "景點分類代碼2",
+    "Class3": "景點分類代碼3",
+    "Mapinfo": "景點地圖Y座標",
+    "Level": "古蹟分級",
+    "Website": "景點網址",
+    "Parkinginfo": "停車資訊",
+    "Parkinginfo_px": "主要停車場X座標",
+    "Parkinginfo_py": "主要停車場Y座標",
+    "Ticketinfo": "景點票價資訊",
+    "Remarks": "警告及注意事項",
+    "Keyword": "搜尋關鍵字",
+    "Changetime": "資料異動時間",
+}
+
+def read_csv_dicts(path: Path):
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        return list(csv.DictReader(f))
+
+def write_csv_dicts(path: Path, rows: list[dict]):
+    if not rows:
+        raise ValueError("CSV is empty")
+    with path.open("w", encoding="utf-8-sig", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        w.writeheader()
+        w.writerows(rows)
+
+def getCurrentTimestamp():
+    return datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+
+def get_folder_size_mb(folder: Path) -> float:
+    total = 0
+    for p in folder.rglob("*"):
+        if p.is_file():
+            total += p.stat().st_size
+    return total / (1024 * 1024)
+
+def get_content_type(filename: str) -> str:
+    ext = Path(filename).suffix.lower()
+    if ext in [".jpg", ".jpeg"]:
+        return "image/jpeg"
+    if ext == ".png":
+        return "image/png"
+    if ext == ".gif":
+        return "image/gif"
+    if ext == ".webp":
+        return "image/webp"
+    return "application/octet-stream"
+
+# ---- CSV: get fields ----
+@server.route("/api/get-fields", methods=["GET"])
+def api_get_fields():
+    place_id = request.args.get("PlaceID")
+    if not place_id:
+        return jsonify({"message": "Missing PlaceID"}), 400
+
+    try:
+        records = read_csv_dicts(CSV_FILE)
+        record = next((r for r in records if r.get("Id") == place_id), None)
+        if not record:
+            return jsonify({"message": "未找到相關記錄"}), 404
+
+        fields = []
+        for key in record.keys():
+            if key == "Id":
+                continue
+            fields.append({
+                "key": key,
+                "label": fieldMapping.get(key, key),
+                "content": record.get(key, "")
+            })
+
+        return jsonify({"fields": fields})
+    except Exception as e:
+        print("讀取欄位時發生錯誤：", e)
+        return jsonify({"message": "伺服器錯誤，請稍後再試。"}), 500
+
+# ---- CSV: update ----
+@server.route("/api/update-csv", methods=["POST"])
+def api_update_csv():
+    updates = request.get_json(silent=True)
+    if not isinstance(updates, list) or len(updates) == 0:
+        return jsonify({"message": "請提供有效的更新數據！"}), 400
+
+    try:
+        records = read_csv_dicts(CSV_FILE)
+        now = getCurrentTimestamp()
+
+        for u in updates:
+            place_id = u.get("PlaceID")
+            field = u.get("field")
+            content = u.get("content", "")
+            if not place_id or not field:
+                continue
+
+            record = next((r for r in records if r.get("Id") == place_id), None)
+            if record is not None:
+                if field in record:
+                    record[field] = content
+                record["Changetime"] = now
+
+        write_csv_dicts(CSV_FILE, records)
+        return jsonify({"message": "資料已成功更新！若更改景點X、Y座標，需重新繪製地圖。"})
+    except Exception as e:
+        print("更新 CSV 文件時發生錯誤：", e)
+        return jsonify({"message": "更新失敗，請稍後再試。"}), 500
+
+# ---- capacity limit ----
+@server.route("/check_capacity_limit", methods=["POST"])
+def check_capacity_limit():
+    upload_chunks = float(request.form.get("uploadChunks", "0") or 0)
+    folder_size = get_folder_size_mb(UPLOAD_DIR)
+
+    if folder_size >= MAX_FOLDER_SIZE_MB:
+        return jsonify({"error": "上傳空間已滿，請聯繫伺服器管理員。"}), 400
+
+    if (folder_size + upload_chunks) > MAX_FOLDER_SIZE_MB:
+        return jsonify({"error": "上傳大小及資料夾大小之總和超過容量上限，請刪除部分檔案後再嘗試。"}), 400
+
+    return jsonify({"message": "空間充足，可以上傳。"})
+
+# ---- chunk upload ----
+@server.route("/2025_aut_Python_proj", methods=["POST"])
+def upload_chunked_file():
+    chunk = request.files.get("fileChunk")
+    chunkIndex = request.form.get("chunkIndex")
+    fileName = request.form.get("fileName")
+    totalChunks = request.form.get("totalChunks")
+    subid = request.form.get("subid")
+
+    if chunk is None or fileName is None or chunkIndex is None or totalChunks is None:
+        return jsonify({"error": "Missing required fields"}), 400
+
+    try:
+        chunkIndex_i = int(chunkIndex)
+        totalChunks_i = int(totalChunks)
+
+        temp_dir = UPLOAD_DIR / f"{fileName}_tmp"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+
+        chunk_path = temp_dir / f"chunk_{chunkIndex_i}"
+        chunk.save(chunk_path)
+
+        if chunkIndex_i == (totalChunks_i - 1):
+            if not subid:
+                return jsonify({"error": "Missing subid"}), 400
+
+            final_dir = UPLOAD_DIR / subid
+            final_dir.mkdir(parents=True, exist_ok=True)
+            final_path = final_dir / fileName
+
+            with final_path.open("wb") as out:
+                for i in range(totalChunks_i):
+                    part = temp_dir / f"chunk_{i}"
+                    with part.open("rb") as pf:
+                        shutil.copyfileobj(pf, out)
+                    part.unlink(missing_ok=True)
+
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            return jsonify({"message": "File upload complete!"})
+
+        return jsonify({"message": f"Chunk {chunkIndex_i} uploaded successfully."})
+    except Exception as e:
+        print("upload chunk error:", e)
+        return jsonify({"error": "Upload failed"}), 500
+
+# ---- list files ----
+@server.route("/uploads", methods=["GET"])
+def list_uploads():
+    subid = request.args.get("id")
+    if not subid:
+        return jsonify({"error": "缺少必要的id参数"}), 400
+
+    folder = UPLOAD_DIR / subid
+    if not folder.exists():
+        return jsonify({"error": "照片目錄不存在"}), 404
+
+    files = [p.name for p in folder.iterdir() if p.is_file() and not p.name.startswith(".")]
+    return jsonify(files)
+
+# ---- preview ----
+@server.route("/previewimage/<subid>/<filename>", methods=["GET"])
+def preview_image(subid, filename):
+    file_path = UPLOAD_DIR / subid / filename
+    if not file_path.exists():
+        return Response("檔案未找到", status=404)
+    return send_file(str(file_path), mimetype=get_content_type(filename))
+
+# ---- download ----
+@server.route("/uploads/<subid>/<filename>", methods=["GET"])
+def download_image(subid, filename):
+    file_path = UPLOAD_DIR / subid / filename
+    if not file_path.exists():
+        return Response("檔案未找到", status=404)
+    return send_file(str(file_path), as_attachment=True, download_name=filename)
+# === End Flask routes ===
+
 # C#app = dash.Dash(__name__, suppress_callback_exceptions=True)
 ###
 import socket
