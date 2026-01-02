@@ -51,6 +51,7 @@ server=app.server   # gunicorn int_gis_use_dash:server --bind 0.0.0.0:8799
 import csv
 import shutil
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from flask import request, jsonify, send_file, Response
 
@@ -115,8 +116,8 @@ def write_csv_dicts(path: Path, rows: list[dict]):
         w.writeheader()
         w.writerows(rows)
 
-def getCurrentTimestamp():
-    return datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+def getCurrentTimestamp_taipei():
+    return datetime.now(ZoneInfo("Asia/Taipei")).strftime("%Y/%m/%d %H:%M:%S")
 
 def get_folder_size_mb(folder: Path) -> float:
     total = 0
@@ -174,7 +175,7 @@ def api_update_csv():
 
     try:
         records = read_csv_dicts(CSV_FILE)
-        now = getCurrentTimestamp()
+        now = getCurrentTimestamp_taipei()
 
         for u in updates:
             place_id = u.get("PlaceID")
