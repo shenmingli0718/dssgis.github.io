@@ -321,7 +321,8 @@ def create_map1(breakpoint_name, zipcode, server_ip, window_width):
                         // let customedomain='https://ntgisgithubio-production.up.railway.app';
                         // let customedomain='https://ntgis.zeabur.app';
                         // let customedomain=`http://${{server_ip}}:8799`;
-                        let customedomain='https://dssgis-github-io.onrender.com';
+                        // let customedomain='https://dssgis-github-io.onrender.com';
+                        let customedomain='';
                         if (action === "upload") {{
                             // url = `http://${{server_ip}}:8799/static/upload.html?id=${{locationId}}&name=${{name}}`;
                             url = `${{customedomain}}/static/upload.html?id=${{locationId}}&name=${{name}}`;
@@ -629,7 +630,8 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
                             // let customedomain='https://ntgisgithubio-production.up.railway.app';  //114/01/21 modified
                             // let customedomain='https://ntgis.zeabur.app';
                             // let customedomain=`http://${{server_ip}}:8799`;
-                            let customedomain='https://dssgis-github-io.onrender.com';
+                            // let customedomain='https://dssgis-github-io.onrender.com';
+                            let customedomain='';
                             if (action === "upload") {{
                               // url = `http://${{server_ip}}:8799/static/upload.html?id=${{locationId}}&name=${{name}}`;
                                 url = `${{customedomain}}/static/upload.html?id=${{locationId}}&name=${{name}}`;
