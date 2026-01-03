@@ -318,6 +318,8 @@ def create_map1(breakpoint_name, zipcode, server_ip, window_width):
                     function openWindow(action, locationId, name, server_ip) {{
                         // server_ip :取自Dash 的 index_string 模板定義
                         let url = '';
+                        // 取得最上層頁面的網域（避免 iframe/srcDoc 造成 origin 為 null）
+                        const base = window.top.location.origin;
                         // let customedomain='https://ntgisgithubio-production.up.railway.app';
                         // let customedomain='https://ntgis.zeabur.app';
                         // let customedomain=`http://${{server_ip}}:8799`;
@@ -325,15 +327,15 @@ def create_map1(breakpoint_name, zipcode, server_ip, window_width):
                         let customedomain='';
                         if (action === "upload") {{
                             // url = `http://${{server_ip}}:8799/static/upload.html?id=${{locationId}}&name=${{name}}`;
-                            url = `${{customedomain}}/static/upload.html?id=${{locationId}}&name=${{name}}`;
+                            url = `${{base}}/static/upload.html?id=${{locationId}}&name=${{name}}`;
                             window.open(url, '上傳照片', 'width=600, height=400');
                         }} else if (action === "download") {{
                             // url = `http://${{server_ip}}:8799/static/download.html?id=${{locationId}}&name=${{name}}`;
-                            url = `${{customedomain}}/static/download.html?id=${{locationId}}&name=${{name}}`;
+                            url = `${{base}}/static/download.html?id=${{locationId}}&name=${{name}}`;
                             window.open(url, '下載照片', 'scrollbars=yes, resizable=yes, width=600, height=400');
                         }} else if (action === "edit") {{
                             // url = `http://${{server_ip}}:8799/static/edit.html?id=${{locationId}}&name=${{name}}`;
-                                url = `${{customedomain}}/static/edit.html?id=${{locationId}}&name=${{name}}`;
+                                url = `${{base}}/static/edit.html?id=${{locationId}}&name=${{name}}`;
                                 window.open(url, '填寫相關資訊', 'scrollbars=yes, resizable=yes, width=600, height=400');
                         }}   
                         }}
@@ -627,23 +629,25 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
                 <script>
                         function openWindow(action, locationId, name, server_ip) {{
                             let url = '';
+                            // 取得最上層頁面的網域（避免 iframe/srcDoc 造成 origin 為 null）
+                            const base = window.top.location.origin;
                             // let customedomain='https://ntgisgithubio-production.up.railway.app';  //114/01/21 modified
                             // let customedomain='https://ntgis.zeabur.app';
                             // let customedomain=`http://${{server_ip}}:8799`;
                             // let customedomain='https://dssgis-github-io.onrender.com';
-                            let customedomain='';
+                            // let customedomain='';
                             if (action === "upload") {{
                               // url = `http://${{server_ip}}:8799/static/upload.html?id=${{locationId}}&name=${{name}}`;
-                                url = `${{customedomain}}/static/upload.html?id=${{locationId}}&name=${{name}}`;
+                                url = `${{base}}/static/upload.html?id=${{locationId}}&name=${{name}}`;
                                 const newWindow = window.open(url, '上傳照片', 'width=600, height=400');
                             }} else if (action === "download") {{
                               // url = `http://${{server_ip}}:8799/static/download.html?id=${{locationId}}&name=${{name}}`;
-                                    url = `${{customedomain}}/static/download.html?id=${{locationId}}&name=${{name}}`;
+                                    url = `${{base}}/static/download.html?id=${{locationId}}&name=${{name}}`;
                                     const newWindow = window.open(url, '下載照片', 'scrollbars=yes, resizable=yes, width=600, height=400');
                               //const newWindow = window.open(url, '下載照片', 'scrollbars=yes, resizable=yes, width=800, height=600');
                             }} else if (action === "edit") {{
                               // url = `http://${{server_ip}}:8799/static/edit.html?id=${{locationId}}&name=${{name}}`;
-                                    url = `${{customedomain}}/static/edit.html?id=${{locationId}}&name=${{name}}`;
+                                    url = `${{base}}/static/edit.html?id=${{locationId}}&name=${{name}}`;
                               // const newWindow = window.open(url, '填寫相關資訊', 'scrollbars=yes, resizable=yes, width=600, height=400, noopener, noreferrer');
                                     const newWindow = window.open(url, '填寫相關資訊', 'scrollbars=yes, resizable=yes, width=600, height=400');
                               if (!newWindow) {{
