@@ -671,7 +671,14 @@ def update_map_and_dropdown(breakpoint_name: str, map_clicks1, map_clicks2, name
     #map_html = "<p>No map data available.</p>"  # Default or empty map HTML
     #error_msg = ""  # No error initially
     #viewpoint_options = []  # Default empty options
+    from flask import request
     #
+    base_url = request.host_url.rstrip('/')
+
+    # 安全保險：正式環境強制 https
+    if not base_url.startswith("http://127.0.0.1"):
+        base_url = base_url.replace("http://", "https://")
+
     ctx = dash.callback_context  # 用於判斷哪個輸入觸發了回調
     triggered_input = ctx.triggered[0]['prop_id'].split('.')[0]
     # 如果是 zip-area-dropdown 觸發的回調，更新 viewpoint-dropdown 的選項
@@ -685,10 +692,10 @@ def update_map_and_dropdown(breakpoint_name: str, map_clicks1, map_clicks2, name
         elif district:
             if map_clicks2 is not None:
                 if not scenicspot: 
-                    return create_map1(breakpoint_name,district,server_ip,window_width)
+                    return create_map1(breakpoint_name,district,base_url,window_width)
                     print("trace 1 on create_map1")
                 else:
-                    return create_map2(breakpoint_name,district,scenicspot,server_ip,window_width)
+                    return create_map2(breakpoint_name,district,scenicspot,base_url,window_width)
                     # else:
                         # return no_update, no_update, no_update 
         else:

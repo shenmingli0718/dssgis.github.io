@@ -168,7 +168,7 @@ def calculate_center_point(data,selected_zipcode):
     return selected_center
     
 ###
-def create_map1(breakpoint_name, zipcode, server_ip, window_width):
+def create_map1(breakpoint_name, zipcode, base_url, window_width):
     import pandas as pd
     import geopandas as gpd
     import folium
@@ -310,12 +310,35 @@ def create_map1(breakpoint_name, zipcode, server_ip, window_width):
                     <b>{row['Opentime']}</b><br>
                     <b>{row['Add']}</b><br>
                     <b>{row['Tel']}</b><br><br>
-                    <button onclick="openWindow('upload', '{id_}', '{name}', '{server_ip}')">上傳照片</button><br><br>
-                    <button onclick="openWindow('download', '{id_}', '{name}', '{server_ip}')">下載照片</button><br><br>
+                    <button onclick="openWindow('upload', '{id_}', '{name}', '{base_url}')">上傳照片</button><br><br>
+                    <button onclick="openWindow('download', '{id_}', '{name}', '{base_url}')">下載照片</button><br><br>
                     <!-- <button onclick="openWindow('edit', '{id_}', '{name}')">填寫相關資訊</button> -->
                 </div>
                 <script>
-                    function openWindow(action, locationId, name, server_ip) {{
+                    function openWindow(action, locationId, name, base_url) {{
+                            const q = `id=${{encodeURIComponent(locationId)}}&name=${{encodeURIComponent(name)}}`;
+
+                            let path = "";
+                            let windowName = "";
+
+                            if (action === "upload") {{
+                                path = `/static/upload.html?${{q}}`;  // 瀏覽器對相對路徑的解析規則是：/static/upload.html＝ 目前頁面的協定 + 網域 + /static/upload.html
+                                windowName = "上傳照片";
+                            }} else if (action === "download") {{
+                                path = `/static/download.html?${{q}}`;
+                                windowName = "下載照片";
+                            // }} else if (action === "edit") {{
+                            //    path = `/static/edit.html?${{q}}`;
+                            //    windowName = "填寫相關資訊";
+                            // }}
+                            const url = `${{base_url}}${{path}}`;
+                            window.open(
+                                url,
+                                windowName,
+                                "scrollbars=yes,resizable=yes,width=600,height=400,noopener,noreferrer"
+                            );
+                        }}
+                    // function openWindow(action, locationId, name, server_ip) {{
                         // server_ip :取自Dash 的 index_string 模板定義
                         let url = '';
                         // 取得最上層頁面的網域（避免 iframe/srcDoc 造成 origin 為 null）
@@ -326,21 +349,21 @@ def create_map1(breakpoint_name, zipcode, server_ip, window_width):
                         // let customedomain='https://ntgis.zeabur.app';
                         // let customedomain=`http://${{server_ip}}:8799`;
                         // let customedomain='https://dssgis-github-io.onrender.com';
-                        let customedomain='';
-                        if (action === "upload") {{
+                        // let customedomain='';
+                        //if (action === "upload") {{
                             // url = `http://${{server_ip}}:8799/static/upload.html?id=${{locationId}}&name=${{name}}`;
-                            url = `${{base}}/static/upload.html?id=${{locationId}}&name=${{name}}`;
-                            window.open(url, '上傳照片', 'width=600, height=400');
-                        }} else if (action === "download") {{
+                        //    url = `${{base}}/static/upload.html?id=${{locationId}}&name=${{name}}`;
+                        //    window.open(url, '上傳照片', 'width=600, height=400');
+                        ///}} else if (action === "download") {{
                             // url = `http://${{server_ip}}:8799/static/download.html?id=${{locationId}}&name=${{name}}`;
-                            url = `${{base}}/static/download.html?id=${{locationId}}&name=${{name}}`;
-                            window.open(url, '下載照片', 'scrollbars=yes, resizable=yes, width=600, height=400');
-                        }} else if (action === "edit") {{
+                        //    url = `${{base}}/static/download.html?id=${{locationId}}&name=${{name}}`;
+                        //    window.open(url, '下載照片', 'scrollbars=yes, resizable=yes, width=600, height=400');
+                        // }} else if (action === "edit") {{
                             // url = `http://${{server_ip}}:8799/static/edit.html?id=${{locationId}}&name=${{name}}`;
-                                url = `${{base}}/static/edit.html?id=${{locationId}}&name=${{name}}`;
-                                window.open(url, '填寫相關資訊', 'scrollbars=yes, resizable=yes, width=600, height=400');
-                        }}   
-                        }}
+                        //        url = `${{base}}/static/edit.html?id=${{locationId}}&name=${{name}}`;
+                        //        window.open(url, '填寫相關資訊', 'scrollbars=yes, resizable=yes, width=600, height=400');
+                        // }}   
+                        // }}
                         // 使標記的Popup跟隨地圖縮放(視窗內)
                         // function updatePopupSize() {{
                         //    let zoom = mymap.getZoom();
@@ -457,7 +480,7 @@ def create_map1(breakpoint_name, zipcode, server_ip, window_width):
     #
     return f"(斷點名稱: {breakpoint_name} 視窗寬度: {window_width} px)", map_html, error_msg
 # 斷點處理
-def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
+def create_map2(breakpoint_name, zipcode, viewpoint, base_url, window_width):
     import pandas as pd
     import geopandas as gpd
     import folium
@@ -624,12 +647,12 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
                     <b>{row['Px']}(景點X座標)</b><br>
                     <b>{row['Py']}(景點Y座標)</b><br>
                     <b>{row['Changetime']}(資料異動時間)</b><br><br>
-                    <button onclick="openWindow('upload', '{id_}', '{name}', '{server_ip}')">上傳照片</button><br><br>
-                    <button onclick="openWindow('download', '{id_}', '{name}', '{server_ip}')">下載照片</button><br><br>
-                    <button onclick="openWindow('edit', '{id_}', '{name}', '{server_ip}')">填寫相關資訊</button>
+                    <button onclick="openWindow('upload', '{id_}', '{name}', '{base_url}')">上傳照片</button><br><br>
+                    <button onclick="openWindow('download', '{id_}', '{name}', '{base_url}')">下載照片</button><br><br>
+                    <button onclick="openWindow('edit', '{id_}', '{name}', '{base_url}')">填寫相關資訊</button>
                 </div>
                 <script>
-                        function openWindow(action, locationId, name) {{
+                        function openWindow(action, locationId, name, base_url) {{
                             const q = `id=${{encodeURIComponent(locationId)}}&name=${{encodeURIComponent(name)}}`;
 
                             let path = "";
@@ -645,9 +668,9 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
                                 path = `/static/edit.html?${{q}}`;
                                 windowName = "填寫相關資訊";
                             }}
-
+                            const url = `${{base_url}}${{path}}`;
                             window.open(
-                                path,
+                                url,
                                 windowName,
                                 "scrollbars=yes,resizable=yes,width=600,height=400,noopener,noreferrer"
                             );
