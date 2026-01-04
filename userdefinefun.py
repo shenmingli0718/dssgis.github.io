@@ -635,7 +635,9 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
                             // const base = window.top.location.origin;
                             // const base = "https://dssgis.zeabur.app";  // ✅ 一定要含 https://
                             // const base = process.env.DB_HOST || "https://dssgis.zeabur.app";
-                            const base = process.env.DOMAIN;
+                            // const base = process.env.DOMAIN;
+                            let base = server_ip;
+                            if (!base.startsWith("http")) base = "https://" + base;
                             // let customedomain='https://ntgisgithubio-production.up.railway.app';  //114/01/21 modified
                             // let customedomain='https://ntgis.zeabur.app';
                             // let customedomain=`http://${{server_ip}}:8799`;
