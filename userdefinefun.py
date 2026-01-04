@@ -320,7 +320,8 @@ def create_map1(breakpoint_name, zipcode, server_ip, window_width):
                         let url = '';
                         // 取得最上層頁面的網域（避免 iframe/srcDoc 造成 origin 為 null）
                         // const base = window.top.location.origin;
-                        const base = "https://dssgis.zeabur.app";  // ✅ 一定要含 https://
+                        // const base = "https://dssgis.zeabur.app";  // ✅ 一定要含 https://
+                        const base = process.env.DOMAIN;
                         // let customedomain='https://ntgisgithubio-production.up.railway.app';
                         // let customedomain='https://ntgis.zeabur.app';
                         // let customedomain=`http://${{server_ip}}:8799`;
@@ -632,7 +633,9 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
                             let url = '';
                             // 取得最上層頁面的網域（避免 iframe/srcDoc 造成 origin 為 null）
                             // const base = window.top.location.origin;
-                            const base = "https://dssgis.zeabur.app";  // ✅ 一定要含 https://
+                            // const base = "https://dssgis.zeabur.app";  // ✅ 一定要含 https://
+                            // const base = process.env.DB_HOST || "https://dssgis.zeabur.app";
+                            const base = process.env.DOMAIN;
                             // let customedomain='https://ntgisgithubio-production.up.railway.app';  //114/01/21 modified
                             // let customedomain='https://ntgis.zeabur.app';
                             // let customedomain=`http://${{server_ip}}:8799`;
