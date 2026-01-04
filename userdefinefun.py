@@ -629,40 +629,63 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
                     <button onclick="openWindow('edit', '{id_}', '{name}', '{server_ip}')">填寫相關資訊</button>
                 </div>
                 <script>
-                        function openWindow(action, locationId, name, server_ip) {{
-                            let url = '';
+                        function openWindow(action, locationId, name) {{
+                            const q = `id=${{encodeURIComponent(locationId)}}&name=${{encodeURIComponent(name)}}`;
+
+                            let path = "";
+                            let windowName = "";
+
+                            if (action === "upload") {{
+                                path = `/static/upload.html?${{q}}`;  // 瀏覽器對相對路徑的解析規則是：/static/upload.html＝ 目前頁面的協定 + 網域 + /static/upload.html
+                                windowName = "上傳照片";
+                            }} else if (action === "download") {{
+                                path = `/static/download.html?${{q}}`;
+                                windowName = "下載照片";
+                            }} else if (action === "edit") {{
+                                path = `/static/edit.html?${{q}}`;
+                                windowName = "填寫相關資訊";
+                            }}
+
+                            window.open(
+                                path,
+                                windowName,
+                                "scrollbars=yes,resizable=yes,width=600,height=400,noopener,noreferrer"
+                            );
+                        }}
+                        // function openWindow(action, locationId, name, server_ip) {{
+                        //    let url = '';
                             // 取得最上層頁面的網域（避免 iframe/srcDoc 造成 origin 為 null）
                             // const base = window.top.location.origin;
                             // const base = "https://dssgis.zeabur.app";  // ✅ 一定要含 https://
                             // const base = process.env.DB_HOST || "https://dssgis.zeabur.app";
                             // const base = process.env.DOMAIN;
-                            let base = server_ip;
-                            if (!base.startsWith("http")) base = "https://" + base;
+                        //    let base = server_ip;
+                        //    if (!base.startsWith("http")) base = "https://" + base;
                             // let customedomain='https://ntgisgithubio-production.up.railway.app';  //114/01/21 modified
                             // let customedomain='https://ntgis.zeabur.app';
                             // let customedomain=`http://${{server_ip}}:8799`;
                             // let customedomain='https://dssgis-github-io.onrender.com';
                             // let customedomain='';
-                            if (action === "upload") {{
+                        //    if (action === "upload") {{
                               // url = `http://${{server_ip}}:8799/static/upload.html?id=${{locationId}}&name=${{name}}`;
-                                url = `${{base}}/static/upload.html?id=${{locationId}}&name=${{name}}`;
-                                const newWindow = window.open(url, '上傳照片', 'width=600, height=400');
-                            }} else if (action === "download") {{
+                        //        url = `${{base}}/static/upload.html?id=${{locationId}}&name=${{name}}`;
+                        //       const newWindow = window.open(url, '上傳照片', 'width=600, height=400');
+                        //    }} else if (action === "download") {{
                               // url = `http://${{server_ip}}:8799/static/download.html?id=${{locationId}}&name=${{name}}`;
-                                    url = `${{base}}/static/download.html?id=${{locationId}}&name=${{name}}`;
-                                    const newWindow = window.open(url, '下載照片', 'scrollbars=yes, resizable=yes, width=600, height=400');
+                        //           url = `${{base}}/static/download.html?id=${{locationId}}&name=${{name}}`;
+                        //           const newWindow = window.open(url, '下載照片', 'scrollbars=yes, resizable=yes, width=600, height=400');
                               //const newWindow = window.open(url, '下載照片', 'scrollbars=yes, resizable=yes, width=800, height=600');
-                            }} else if (action === "edit") {{
+                        //    }} else if (action === "edit") {{
                               // url = `http://${{server_ip}}:8799/static/edit.html?id=${{locationId}}&name=${{name}}`;
-                                    url = `${{base}}/static/edit.html?id=${{locationId}}&name=${{name}}`;
+                        //            url = `${{base}}/static/edit.html?id=${{locationId}}&name=${{name}}`;
                               // const newWindow = window.open(url, '填寫相關資訊', 'scrollbars=yes, resizable=yes, width=600, height=400, noopener, noreferrer');
-                                    const newWindow = window.open(url, '填寫相關資訊', 'scrollbars=yes, resizable=yes, width=600, height=400');
-                              if (!newWindow) {{
-                                  console.error('子窗口打開失敗，請檢查瀏覽器設置是否阻止彈出窗口。');
-                              }}  
+                        //            const newWindow = window.open(url, '填寫相關資訊', 'scrollbars=yes, resizable=yes, width=600, height=400');
+                        //      if (!newWindow) {{
+                        //          console.error('子窗口打開失敗，請檢查瀏覽器設置是否阻止彈出窗口。');
+                        //      }}  
                               // newWindow.document.write(`<h3>填寫相關資訊 for 景點 ${{locationId}}(${{name}})</h3><button onclick="window.close()">關閉視窗</button>`);
-                            }};
-                        }}
+                        //    }};
+                        //}}
 
                     // 父窗口監聽消息
                     // window.addEventListener('message', function (event) {{
