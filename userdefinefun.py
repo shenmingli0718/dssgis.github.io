@@ -319,7 +319,8 @@ def create_map1(breakpoint_name, zipcode, server_ip, window_width):
                         // server_ip :取自Dash 的 index_string 模板定義
                         let url = '';
                         // 取得最上層頁面的網域（避免 iframe/srcDoc 造成 origin 為 null）
-                        const base = window.top.location.origin;
+                        // const base = window.top.location.origin;
+                        const base = "https://dssgis.zeabur.app";  // ✅ 一定要含 https://
                         // let customedomain='https://ntgisgithubio-production.up.railway.app';
                         // let customedomain='https://ntgis.zeabur.app';
                         // let customedomain=`http://${{server_ip}}:8799`;
@@ -630,7 +631,8 @@ def create_map2(breakpoint_name, zipcode, viewpoint, server_ip, window_width):
                         function openWindow(action, locationId, name, server_ip) {{
                             let url = '';
                             // 取得最上層頁面的網域（避免 iframe/srcDoc 造成 origin 為 null）
-                            const base = window.top.location.origin;
+                            // const base = window.top.location.origin;
+                            const base = "https://dssgis.zeabur.app";  // ✅ 一定要含 https://
                             // let customedomain='https://ntgisgithubio-production.up.railway.app';  //114/01/21 modified
                             // let customedomain='https://ntgis.zeabur.app';
                             // let customedomain=`http://${{server_ip}}:8799`;
