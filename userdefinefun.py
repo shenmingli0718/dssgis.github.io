@@ -814,7 +814,7 @@ def create_map2(breakpoint_name, zipcode, viewpoint, base_url, window_width):
                 "color": "#A7BFA8",             # 邊線顏色
                 "weight": 0.3,                  # 邊線粗細，預設通常為 3
                 "fillColor": "#CFE3D2",         # 填滿顏色
-                "fillOpacity": 0.95             # 透明度（1.0 = 完全不透明）
+                "fillOpacity": 0.98             # 透明度（1.0 = 完全不透明）
             }
 
             Draw(
