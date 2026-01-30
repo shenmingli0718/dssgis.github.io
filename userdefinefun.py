@@ -807,6 +807,35 @@ def create_map2(breakpoint_name, zipcode, viewpoint, base_url, window_width):
             ###
             ## Marker(location = [row['Py'], row['Px']], popup = row['Name'], icon=folium.Icon(color="green")).add_to(mymap)
             Marker(location = [row['Py'], row['Px']], popup =popup, icon=folium.Icon(color="red")).add_to(mymap)
+            ##
+            from folium.plugins import Draw
+
+            MASK_STYLE = {
+                "color": "#A7BFA8",             # 邊線顏色
+                "weight": 0.3,                  # 邊線粗細，預設通常為 3
+                "fillColor": "#CFE3D2",         # 填滿顏色
+                "fillOpacity": 0.90             # 透明度（1.0 = 完全不透明）
+            }
+
+            Draw(
+                export=False,                 # 不允許匯出 GeoJSON（可下載）
+                filename="mask.geojson",
+                position="topleft",
+                draw_options={
+                    "polygon": {
+                        "shapeOptions": MASK_STYLE
+                    },
+                    "rectangle": {
+                        "shapeOptions": MASK_STYLE
+                    },
+                    "polyline": False,
+                    "circle": False,
+                    "circlemarker": False,
+                    "marker": False,
+                },
+                edit_options={"edit": True, "remove": True}
+            ).add_to(mymap)
+            ##
             # Marker(location = [row['Py'], row['Px']], popup =popup_html, icon=folium.Icon(color="red")).add_to(mymap)
     #
     #vp_dropdown_options = [
